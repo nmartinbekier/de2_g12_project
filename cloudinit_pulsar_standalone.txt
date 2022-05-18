@@ -1,0 +1,36 @@
+#cloud-config
+
+apt_update: true
+apt_upgrade: true
+packages:
+ - ca-certificates
+ - curl
+ - software-properties-common
+ - gnupg
+ - lsb-release
+ - python3-pip
+ - python3-dev
+ - build-essential
+
+byobu_default: system 
+
+runcmd:
+ - pip3 install numpy
+ - pip3 install matplotlib
+ - pip3 install pandas
+ - pip3 install notebook 
+ - pip3 install jupyterlab 
+ - pip3 install pulsar-client==2.10.0
+ - pip install pulsar-client[functions]=='2.10.0'
+ - echo "adding docker repo"
+ - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+ - add-apt-repository -y "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+ - apt-get update -y
+ - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+ - echo "adding docker-compose"
+ - curl -SL https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+ - chmod +x /usr/local/bin/docker-compose
+ - wget https://archive.apache.org/dist/pulsar/pulsar-2.10.0/apache-pulsar-2.10.0-bin.tar.gz
+ - tar xvfz apache-pulsar-2.10.0-bin.tar.gz
+ - mv apache-pulsar-2.10.0 apache-pulsar
+
