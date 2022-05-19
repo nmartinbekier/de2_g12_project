@@ -11,17 +11,19 @@ packages:
  - python3-pip
  - python3-dev
  - build-essential
+ - default-jre
 
 byobu_default: system 
 
 runcmd:
+ - pip3 install pulsar-client==2.10.0
+ - pip3 install pulsar-client[functions]=='2.10.0'
  - pip3 install numpy
  - pip3 install matplotlib
  - pip3 install pandas
+ - pip3 install Jinja2==3.1
  - pip3 install notebook 
  - pip3 install jupyterlab 
- - pip3 install pulsar-client==2.10.0
- - pip install pulsar-client[functions]=='2.10.0'
  - echo "adding docker repo"
  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
  - add-apt-repository -y "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
