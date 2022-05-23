@@ -1,9 +1,9 @@
 #cloud-config
 
 users:
- - name: appuser
+ - name: ubuntu
    sudo: ALL=(ALL) NOPASSWD:ALL
-   home: /home/appuser
+   home: /home/ubuntu
    shell: /bin/bash
    ssh_authorized_keys:
      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1/S7R2//BE7WGa6atB4/oFl2rkBuodfyrk6BICoNk6r4Qj95DQP7js4eH7ZSYE4yhFzIeRkqXN9QARYK2fhsgdRg+KmpqZViHpvDHAifzoJSiCSPOoqLMUlFTYTSoYleQ6ffEeuBIW4R4paqpSSMShlwEkQ6OX41Amys8t1kH/k49E7pPY6dx2/n+SYcMIVbNE+VLZCfku8oN/1dKWiyLMF3NegA4Q/ryER9HGC/qPpqCwG4oUAiTnVQE75HXHCD9jfmK8v0UeISi0tlY5VyIQ695+1XuEHY305h9+vQmRa1Ne3fi7epXeals4Qq/HOJD1iYSD2/brpQ1LJ1gYxcs3lmb6JXHrGDLfTBoSSuXWp+x4Iy64DHlR0j9u/5Xv8v4oBkQ7BAILNpWr8Y2QdKBt7gSR1Dj+3in9QpXQn4dJzCRaySOG1/+tqMeZwm4S7BHWrd2CtQ0ah4H79k5ySz7biVpNfGtWY81eZojU5OKeZutn4cWos8xSro5xmVuoRs= ubuntu@olledelborg-dev
