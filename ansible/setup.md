@@ -7,6 +7,7 @@
 4. cluster-key.pub should be copied into the files consumer-cfg.txt and producer-cfg.txt
 5. (~/)                        Run the command: ***source UPPMAX2022_1-1-openrc.sh***
 6. (~/de2_g12_project/ansible) Run the command: ***python3 start_instances.py***
+**NOTE:** If you want to automatically start ansible when running start_instances.py (with a 15 minute delay), update start_ansible=True
 
 **Requires the packages (on client machine):**
 1. nova-client
