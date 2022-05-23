@@ -1,1 +1,4 @@
-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 # simons token
+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 # Simons token
+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 # Olles token
+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 # Sofias token
+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 # Nicolas token
