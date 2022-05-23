@@ -112,3 +112,10 @@ if ip_address_dev is None:
 
 print ("Instance: "+ instance_prod.name +" is in " + inst_status_prod + " state" + " ip address: "+ ip_address_prod)
 print ("Instance: "+ instance_dev.name +" is in " + inst_status_dev + " state" + " ip address: "+ ip_address_dev)
+
+#update etc/ansible/hosts with IP. Note: must be sudo to run
+text_file = open("/etc/ansible/hosts", "w")
+n = text_file.write("[servers]" + "\n" + "prodserver ansible_host=" + ip_address_prod+ "\n" + "conserver ansible_host=" + ip_address_dev + "\n" + "[all:vars]" + "\n" + "ansible_python_interpreter=/usr/bin/python3" + "\n" + "[prodserver]" + "\n" + "prodserver ansible_connection=ssh ansible_user=ubuntu" + "\n" + "[devserver]" + "\n" +"devserver ansible_connection=ssh ansible_user=ubuntu")
+text_file.close()
+print("Adding: " + ip_address_prod + " to /etc/ansible/hosts")
+print("Adding: " + ip_address_dev + " to /etc/ansible/hosts")

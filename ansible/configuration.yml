@@ -12,21 +12,21 @@
      with_items: "{{groups['all']}}"
      become: true
      
-   #- name: Set hostname
-   #  hostname: name="{{inventory_hostname}}"
-   #  become: true
+   - name: Set hostname
+     hostname: name="{{inventory_hostname}}"
+     become: true
 
    - name: apt update
      apt: update_cache=yes upgrade=dist
      become: true
 
-   - name: Download git repository
-     become: true
-     git:
+   #- name: Download git repository
+   #  become: true
+   #  git:
       #repo: 'https://github.com/OlleDelborg/personal.git'
-      repo: 'https://github.com/nmartinbekier/de2_g12_project.git'
-      #repo: 'https://olledelborg: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@github.com/github.com/nmartinbekier/de2_g12_project.git'
-      dest: /src 
+      #repo: 'https://github.com/nmartinbekier/de2_g12_project.git'
+    #  repo: 'https://olledelborg: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@github.com/github.com/nmartinbekier/de2_g12_project.git'
+    #  dest: /de2_g12_project/
    
 # unsure about this
    - name: Change ownership of a directory
@@ -36,8 +36,8 @@
       path: /ansible
       state: directory
       recurse: yes
-      owner: appuser
-      group: appuser
+      owner: ubuntu
+      group: ubuntu
 
 - hosts: prodserver
  
