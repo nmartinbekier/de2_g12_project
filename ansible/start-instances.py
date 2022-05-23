@@ -32,6 +32,7 @@ private_net = "UPPMAX 2022/1-1 Internal IPv4 Network"
 floating_ip_pool_name = None
 floating_ip = None
 image_name = "Ubuntu 20.04 - 2021.03.23"
+start_ansible = False
 
 identifier = random.randint(1000,9999)
 
@@ -119,3 +120,9 @@ n = text_file.write("[servers]" + "\n" + "prodserver ansible_host=" + ip_address
 text_file.close()
 print("Adding: " + ip_address_prod + " to /etc/ansible/hosts")
 print("Adding: " + ip_address_dev + " to /etc/ansible/hosts")
+
+if start_ansible:
+    print("Waiting for 15 minutes..")
+    time.sleep(900)
+    print("Starting Ansible")
+    os.system("ansible-playbook configuration.yml --private-key=/home/ubuntu/cluster-keys/cluster-key")
