@@ -3,6 +3,7 @@ import uuid
 from typing import List, Dict
 
 import requests
+from requests import Response
 
 
 def find_property(tree: Dict, path: List[str]):
@@ -14,6 +15,11 @@ def find_property(tree: Dict, path: List[str]):
         result = result[way]
 
     return result
+
+
+def ensure_success(response: Response):
+    if not response.ok:
+        raise Exception(f"Received HTTP status code does not indicate success: {response.status_code}")
 
 
 class RepoName:
@@ -89,6 +95,8 @@ class Github:
             headers=headers,
             params=params)
 
+        ensure_success(response)
+
         repo_list = response.json()
         results = []
 
@@ -137,6 +145,8 @@ class Github:
 
         response = requests.post('https://api.github.com/graphql', headers=headers,
                                  json=json_data)
+
+        ensure_success(response)
 
         response_dict = response.json()
         result_dict = response_dict["data"]
