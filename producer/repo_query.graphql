@@ -1,0 +1,26 @@
+{
+$REPOS
+}
+
+fragment RepoFragment on Repository {
+  name,
+  owner
+  {
+    login
+  },
+  primaryLanguage {
+    id,
+    name
+  },
+  defaultBranchRef {
+    name
+    target {
+      ... on Commit {
+        id
+        history(first: 0) {
+          totalCount
+        }
+      }
+    }
+  }
+}
