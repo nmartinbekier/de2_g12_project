@@ -20,13 +20,12 @@
      apt: update_cache=yes upgrade=dist
      become: true
 
-   #- name: Download git repository
-   #  become: true
-   #  git:
-      #repo: 'https://github.com/OlleDelborg/personal.git'
-      #repo: 'https://github.com/nmartinbekier/de2_g12_project.git'
-    #  repo: 'https://olledelborg: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@github.com/github.com/nmartinbekier/de2_g12_project.git'
-    #  dest: /de2_g12_project/
+   - name: Download git repository
+     become: true
+     git:
+      #repo: 'https://olledelborg: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@github.com/nmartinbekier/de2_g12_project.git'
+      #repo: 'https://olledelborg:@github.com/nmartinbekier/de2_g12_project.git'
+      dest: /de2_g12_project/
    
 # unsure about this
    - name: Change ownership of a directory
@@ -94,7 +93,7 @@
      apt: pkg=docker-ce state=present update_cache=true allow_unauthenticated=yes
      become: true
 
-   - name: Download docker-compose 
+    - name: Download docker-compose 
      become: yes
      get_url:        
       url: "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-{{ansible_system}}-{{ansible_architecture}}"
@@ -105,13 +104,13 @@
    #  become: true
    #  shell: docker build .
    #  args: 
-   #   chdir: /model_serving/ci_cd/production_server
+   #   chdir: home/ubuntu/de2_g12_project/producer.py
 
    #- name: Running containers
    #  become: true
    #  shell: docker-compose up -d 
    #  args: 
-   #   chdir: /model_serving/ci_cd/production_server 
+   #   chdir: home/ubuntu/de2_g12_project/ 
 
 - hosts: conserver
   
@@ -122,8 +121,14 @@
    - name: Extra packages
      apt: pkg=python3-pip state=latest update_cache=true  
      become: true
-   #update this
-   #- name: Install ML packages
+   #- name: Building containers
    #  become: true
-   #  pip: 
-   #   name: tensorflow==2.5.3, keras==2.4.1, numpy, future
+   #  shell: docker build .
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/consumer.py
+
+   #- name: Running containers
+   #  become: true
+   #  shell: docker-compose up -d 
+   #  args: 
+   #   chdir: /home/ubuntu/de2_g12_project
