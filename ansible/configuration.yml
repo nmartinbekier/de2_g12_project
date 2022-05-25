@@ -24,8 +24,8 @@
      become: true
      git:
       #repo: 'https://olledelborg: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@github.com/nmartinbekier/de2_g12_project.git'
-      #repo: 'https://olledelborg:@github.com/nmartinbekier/de2_g12_project.git'
-      dest: /de2_g12_project/
+      repo: 'https://olledelborg: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@github.com/nmartinbekier/de2_g12_project.git'
+      dest: /home/ubuntu/de2_g12_project/
    
 # unsure about this
    - name: Change ownership of a directory
