@@ -4,7 +4,6 @@ import time
 import pulsar
 from pulsar import PartitionsRoutingMode
 from pulsar import MessageId
-from pulsar import Function
 import _pulsar
 
 class PulsarConnection:
@@ -72,55 +71,7 @@ class PulsarConnection:
         reader.close()
         
         return True
-    
-    def load_all_git_tokens(self):
-        """ Flush tokens in 'free_token' and 'standby_token' and load all
-        again in 'free_token' """
-        
-        while True:
-            token = self.get_free_token()
-            if token == None: break
-        
-        # while True:            
-            #token = self.get_standby_token()
-            #if token == None: break
-            
-        token_list = [token.split("#")[0].strip() for token in open(
-            "tokens.txt", "r").readlines()]
-        
-        for token in token_list:
-            self.put_free_token(token)
-            
-        return True
-    
-    def create_day_to_process(self):
-        """ Create the 'day_to_process' topic with 365 'YYYY-MM-DD' values.
-        To be called automatically while initializing, but also making it externally
-        available for test purposes """
-        print("\n*** Populating 'day_to_process' topic ***\n")
-        try:
-            curr_time = str(int(time.time()))
-            topic_name = 'day_to_process'
-            day_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'day_to_process' topic: {e} ***\n")
-            day_producer.close()
-            return
-        init_date = datetime.datetime(2021, 1, 1)
-        dates = [(init_date + datetime.timedelta(days=idx)).strftime('%Y-%m-%d') for idx in range(365)]
-        
-        for date in dates:
-            try:
-                day_producer.send((f"{date}").encode('utf-8'))      
-            except Exception as e:
-                print(f"\n*** Exception sending date message: {e} ***\n")
-                day_producer.close()
-                return
-        day_producer.close()
-        return True
-    
+
     def _initialize_pulsar(self):
         """ Initialize relevant topics: 'initialized', 'days_processed' """
         
@@ -169,6 +120,80 @@ class PulsarConnection:
         self.initialized = True
         print("\n*** The system has been initialized. Now get working! ***\n")
         
+        return True    
+    
+    def _put_days_processed(self, day):
+        """ Keeps track of which days have been processed so far (each day with a
+        ‘YYYY-MM-DD’ format). Useful to compute partial ‘global’ results every
+        certain time by Pulsar Functions. """
+        try:
+            topic_name = 'days_processed'
+            days_processed_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating 'days_processed' topic: {e} ***\n")
+            days_processed_producer.close()
+            return
+       
+        try:
+            days_processed_producer.send((
+                f"{day}").encode('utf-8'))      
+        except Exception as e:
+            print(f"\n*** Exception sending date message: {e} ***\n")
+            days_processed_producer.close()
+            return
+            
+        days_processed_producer.close()        
+        return True
+        
+    def load_all_git_tokens(self):
+        """ Flush tokens in 'free_token' and 'standby_token' and load all
+        again in 'free_token' """
+        
+        while True:
+            token = self.get_free_token()
+            if token == None: break
+        
+        # while True:            
+            #token = self.get_standby_token()
+            #if token == None: break
+            
+        token_list = [token.split("#")[0].strip() for token in open(
+            "tokens.txt", "r").readlines()]
+        
+        for token in token_list:
+            self.put_free_token(token)
+            
+        return True
+    
+    def create_day_to_process(self):
+        """ Create the 'day_to_process' topic with 365 'YYYY-MM-DD' values.
+        To be called automatically while initializing, but also making it externally
+        available for test purposes """
+        print("\n*** Populating 'day_to_process' topic ***\n")
+        try:
+            curr_time = str(int(time.time()))
+            topic_name = 'day_to_process'
+            day_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating 'day_to_process' topic: {e} ***\n")
+            day_producer.close()
+            return
+        init_date = datetime.datetime(2021, 1, 1)
+        dates = [(init_date + datetime.timedelta(days=idx)).strftime('%Y-%m-%d') for idx in range(365)]
+        
+        for date in dates:
+            try:
+                day_producer.send((f"{date}").encode('utf-8'))      
+            except Exception as e:
+                print(f"\n*** Exception sending date message: {e} ***\n")
+                day_producer.close()
+                return
+        day_producer.close()
         return True
     
     def get_day_to_process(self):
@@ -206,6 +231,9 @@ class PulsarConnection:
         
         # Close at the end so no to block other processes that use the same subscription
         day_consumer.close()
+        
+        self._put_days_processed(message)
+        
         return message
             
     def get_initializing(self):
