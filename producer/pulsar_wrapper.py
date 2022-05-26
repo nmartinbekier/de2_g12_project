@@ -1,10 +1,23 @@
 import requests
 import datetime
 import time
+import bisect
 import pulsar
 from pulsar import PartitionsRoutingMode
 from pulsar import MessageId
 import _pulsar
+import sortedcontainers
+
+class RepoCommits(object):
+    """ Data Type to support tuple in-place sorting using sortedcontainers """
+    def __init__(self, repo_tuple):
+        self.ident = repo_tuple[0]
+        self.commits = repo_tuple[1]
+        self.owner = repo_tuple[2]
+        self.repo_name = repo_tuple[3]
+        
+    def __repr__(self):
+        return f"({self.ident}, {self.commits}, '{self.owner}', '{self.repo_name}')"
 
 class PulsarConnection:
 
@@ -16,6 +29,8 @@ class PulsarConnection:
         self.initializing = False
         self.initialized = False
         self.last_day_processed = False
+        self.days_to_review = 15 # Lapse of days to make an update on partial results
+        self.top_repos_partial_results = 100 # Top commited repositories to publish in partial results
         self._set_init_status() # updates 'initialized' and 'initializing'
         # Initialize the system if it hasn't
         if not self.initialized:
@@ -174,7 +189,6 @@ class PulsarConnection:
         available for test purposes """
         print("\n*** Populating 'day_to_process' topic ***\n")
         try:
-            curr_time = str(int(time.time()))
             topic_name = 'day_to_process'
             day_producer = self.client.create_producer(
                 topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
@@ -217,7 +231,7 @@ class PulsarConnection:
         try:
             msg = day_consumer.receive()
             # Save the string message (decode from byte value)
-            message = str(msg.value().decode())
+            day = str(msg.value().decode())
             # Acknowledge that the message was received          
             day_consumer.acknowledge(msg)
         except Exception as e:
@@ -225,16 +239,20 @@ class PulsarConnection:
             day_consumer.close()
             return
         
+        day_of_year = int(datetime.datetime.strptime(day, '%Y-%m-%d').strftime('%j'))
+        if (day_of_year%self.days_to_review == 0):
+            self.process_partial_results(day)
+        
         # If we reached the end, signal so we start sending None from next call on
-        if message == '2021-12-31':
+        if day == '2021-12-31':
             self.last_day_processed = True
         
         # Close at the end so no to block other processes that use the same subscription
         day_consumer.close()
         
-        self._put_days_processed(message)
+        self._put_days_processed(day)
         
-        return message
+        return day
             
     def get_initializing(self):
         return self.initializing
@@ -411,7 +429,7 @@ class PulsarConnection:
         return repo_list
 
     def put_commit_repo_info(self, repo_list):
-        """ Publishes a series of (repo_id, num_commits) tuples in the
+        """ Publishes a series of (repo_id, num_commits, 'repo_owner', 'repo_name') tuples in the
         commit_repo_info topic"""
         try:
             topic_name = 'commit_repo_info'
@@ -427,7 +445,7 @@ class PulsarConnection:
         for repo in repo_list:
             try:
                 commit_repo_producer.send((
-                    f"({repo[0]}, {repo[1]})").encode('utf-8'))      
+                    f"({repo[0]}, {repo[1]}, '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
             except Exception as e:
                 print(f"\n*** Exception sending commit_repo_info message: {e} ***\n")
                 commit_repo_producer.close()
@@ -524,6 +542,71 @@ class PulsarConnection:
         repo_with_ci_producer.close()
         return True
     
+    def process_partial_results(self, cutoff_date):
+        """ Process partial answers up to existing information. Publish top (not all)
+        committed repos to a special result topic, which will be further processed
+        by Pulsar Functions """
+        # Create a consumer on persistent topic with the commit information of repos
+        # with unique name, so it always start from the beginning
+        topic_name = 'commit_repo_info'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                reader_name=f'{topic_name}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for commit_repo_info: {e} ***\n")
+            reader.close()
+            return
+        
+        # Ordered list supporting in-place insertion
+        ord_list = sortedcontainers.SortedKeyList(key=lambda x: -x.commits)
+        lower_value = 0 # Keep track of minimum value from the list
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                message = str(msg.value().decode())
+                repo_tuple = eval(message)
+                # Only add on list if bigger than lower_value
+                if (repo_tuple[1] > lower_value):
+                    ord_list.add(RepoCommits(repo_tuple))
+                    # When exceeding size, take last element and update lower_value
+                    if (len(ord_list) > self.top_repos_partial_results):
+                        lower_value = ord_list.pop()[1]
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'commit_repo_info': {e} ***\n")
+                break      
+        reader.close()
+        
+        # Now publish the results in a {cutoff_date}_partial_result_commit topic
+        try:
+            topic_name = f'{cutoff_date}_partial_result_commit'
+            partial_result_commit_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating '{cutoff_date}_partial_result_commit' topic: {e} ***\n")
+            partial_result_commit_producer.close()
+            return
+        
+        for repo in ord_list.irange():
+            try:
+                partial_result_commit_producer.send((
+                    f"({repo.ident}, {repo.commits}, '{repo.owner}', '{repo.repo_name}')").encode('utf-8'))
+            except Exception as e:
+                print(f"\n*** Exception sending basic_repo_info message: {e} ***\n")
+                partial_result_commit_producer.close()
+                return
+            
+        partial_result_commit_producer.close()      
+        
+        return True
+
+    
 """
 # Test code
 
@@ -543,7 +626,12 @@ repo_list = [
     (1, 'owner_1', 'repo_1', 'language_1'),
     (2, 'owner_2', 'repo_2', 'language_2'),
     (3, 'owner_3', 'repo_3', 'language_1')]
-commit_repo_list = [(1, 15),(2, 20),(3, 25)]
+
+commit_repo_list = [
+    (4, 16, 'owner_1', 'repo_1'),
+    (5, 21, 'owner_2', 'repo_2'),
+    (6, 26, 'owner_3', 'repo_3')]
+    
 repos_with_tests_list = [(1, 'Python'),(2, 'C#'),(3, 'Javascript')]
 repos_with_ci_list = [(10, 'Lisp'),(11, 'Java'),(12, 'Go')]
 
@@ -554,6 +642,7 @@ my_pulsar.put_commit_repo_info(commit_repo_list)
 
 my_pulsar.put_repo_with_ci(repos_with_ci_list)
 
+my_pulsar.process_partial_results('2021-01-28')
 
 my_pulsar.close()
 """
