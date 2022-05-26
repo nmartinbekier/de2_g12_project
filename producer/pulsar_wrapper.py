@@ -256,7 +256,7 @@ class PulsarConnection():
                 subscription_name=f'{topic_name}_sub',
                 initial_position=_pulsar.InitialPosition.Earliest)
         except Exception as e:
-            print(f"\n*** Exception creating day_consumer: {e} ***\n")
+            print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
             basic_repo_info_consumer.close()
             return
         
@@ -272,14 +272,15 @@ class PulsarConnection():
                 # Acknowledge that the message was received          
                 basic_repo_info_consumer.acknowledge(msg)
             except Exception as e:
-                print(f"\n*** Exception receiving value from 'day_consumer': {e} ***\n")
+                print(f"\n*** Exception receiving value from 'basic_repo_info': {e} ***\n")
+                print("Might have reached the limit of available repos in the topic")
                 break
         
         basic_repo_info_consumer.close()
         return repo_list
     
     def put_free_token(self, token):
-        """ pops the string of an available token """
+        """ Posts a token id string with available quota """
         try:
             topic_name = 'free_token'
             free_token_producer = self.client.create_producer(
@@ -300,7 +301,7 @@ class PulsarConnection():
             return
             
         free_token_producer.close()        
-        return token
+        return True
     
     def get_free_token(self):
         """ pops the string of an available token """
@@ -329,6 +330,59 @@ class PulsarConnection():
             return None
         
         free_token_consumer.close()
+        return token
+    
+    def put_standby_token(self, token):
+        """ posts a token id string from a token with exhausted quota """
+        topic_name = 'standby_token'
+        try:
+            standby_token_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating 'standby_token' topic: {e} ***\n")
+            standby_token_producer.close()
+            return
+       
+        try:
+            standby_token_producer.send((
+                f"{token}").encode('utf-8'))      
+        except Exception as e:
+            print(f"\n*** Exception sending standby_token message: {e} ***\n")
+            standby_token_producer.close()
+            return
+            
+        standby_token_producer.close()
+        return True
+
+    def get_standby_token(self):
+        """  pops the string of a standby token """
+        topic_name = 'standby_token'
+        try:
+            standby_token_consumer = self.client.subscribe(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                subscription_name=f'{topic_name}_sub',
+                initial_position=_pulsar.InitialPosition.Earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating standby_token_consumer: {e} ***\n")
+            standby_token_consumer.close()
+            return None
+        
+        try:
+            # Give up to half a second to receive an answer
+            msg = standby_token_consumer.receive(timeout_millis=500)
+            # Save the string message (decode from byte value)
+            token = str(msg.value().decode())
+            # Acknowledge that the message was received          
+            standby_token_consumer.acknowledge(msg)
+        except Exception as e:
+            print(f"\n*** Exception receiving value from 'standby_token_consumer': {e} ***")
+            print("\nMight have run out of standby tokens\n")
+            standby_token_consumer.close()
+            return None
+        
+        standby_token_consumer.close()
         return token
 
 """
