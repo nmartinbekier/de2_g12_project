@@ -67,7 +67,7 @@ class PulsarConnection():
             msg = reader.read_next(timeout_millis=3000)
             message = str(msg.value().decode())
         except Exception as e:
-            print(f"\n*** Didn't found 'Initilized' message : {e} ***\n")
+            print(f"\n*** Didn't found 'Initialized' message : {e} ***\n")
             
         if message == "Initialized":
             print("Found 'Initialized' message")
@@ -75,6 +75,26 @@ class PulsarConnection():
             self.initializing = False
         reader.close()
         
+        return True
+    
+    def load_all_git_tokens(self):
+        """ Flush tokens in 'free_token' and 'standby_token' and load all
+        again in 'free_token' """
+        
+        while True:
+            token = self.get_free_token()
+            if token == None: break
+        
+        # while True:            
+            #token = self.get_standby_token()
+            #if token == None: break
+            
+        token_list = [token.split("#")[0].strip() for token in open(
+            "tokens.txt", "r").readlines()]
+        
+        for token in token_list:
+            self.put_free_token(token)
+            
         return True
     
     def create_day_to_process(self):
@@ -138,7 +158,8 @@ class PulsarConnection():
         
         self.initializing = True
             
-        self.create_day_to_process()
+        self.create_day_to_process() # Creates 365 days in 'day_to_process' topic
+        self.load_all_git_tokens() # Loads 4 tokens in 'free_token'
         
         try:
             init_producer.send(("Initialized").encode('utf-8'))      
@@ -321,6 +342,8 @@ print(f"Already initialized: {my_pulsar.get_initialized()}\n")
 my_pulsar.get_day_to_process()
 my_pulsar.put_free_token("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")
 token = my_pulsar.get_free_token()
+
+my_pulsar.load_all_git_tokens()
 
 repo_list = [
     (1, 'owner_1', 'repo_1', 'language_1'),
