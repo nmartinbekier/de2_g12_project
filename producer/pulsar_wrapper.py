@@ -7,10 +7,10 @@ from pulsar import MessageId
 from pulsar import Function
 import _pulsar
 
-class PulsarConnection():
+class PulsarConnection:
 
-    def __init__(self):
-        self.client = pulsar.Client('pulsar://localhost:6650')
+    def __init__(self, ip_address='localhost'):
+        self.client = pulsar.Client(f'pulsar://{ip_address}:6650')
         self.tenant = 'public'
         self.namespace = 'default'
         self.static_namespace = 'static'
