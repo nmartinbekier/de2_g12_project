@@ -1,5 +1,5 @@
 """
-To enable this, it has to be called by pulsar admin:
+To enable this, it has to be called by pulsar admin. Adjust depending on 'aggregate_functions.py' path
 $ bin/pulsar-admin functions create \
   --py ~/de2_g12_project/producer/aggregate_functions.py \
   --classname aggregate_functions.AggregateFunction \

@@ -1,3 +1,44 @@
+"""
+Requires pulsar-client: pip install pulsar-client==2.10.0
+Requires sortedcontainers: pip install sortedcontainers
+
+For this script to work, requires having a Pulsar Standalone receiving connections in port:6650
+If Pulsar server is not in localhost, instantiate the class with the IP its running on. For
+ex: my_pulsar = pulsar_wrapper.PulsarConnection(ip_address=192.168.##.##)
+
+Pulsar namespaces also have to be configured so topics behave as they are intended below.
+The following commands are needed for this, using pulsar-admin command line:
+$bin/pulsar-admin namespaces set-retention public/default --size 0 --time 0
+$bin/pulsar-admin namespaces set-deduplication public/default --enable
+$bin/pulsar-admin namespaces create public/static
+$bin/pulsar-admin namespaces set-retention public/static --size -1 --time -1
+$bin/pulsar-admin namespaces set-deduplication public/static --enable
+
+Also, the Pulsar Function service also has to be started for this to work.
+Instructions for the command line instruction to start it are in 'aggregate_functions.py'
+
+This script uses the following topics. They can be listed, examined or deleted using
+'bin/pulsar-admin topics' commands
+
+Topics in public/default namespace (doesn't retain messages):
+persistent://public/default/basic_repo_info
+persistent://public/default/repo_with_tests
+persistent://public/default/day_to_process
+
+Topics in public/static namespace (retains messages):
+persistent://public/static/initialized
+persistent://public/static/days_processed
+persistent://public/static/free_token
+persistent://public/static/commit_repo_info
+persistent://public/static/repo_with_ci
+
+persistent://public/static/*YYYY-MM-DD*_partial_result_commit
+persistent://public/static/aggregate_languages_info : signals Pulsar to compute results for this language
+persistent://public/static/languages : list of unique languages
+persistent://public/static/language_results : posts aggregated information of each language in tuples
+of the form: ('language', num_repos, num_tests, num_ci)
+
+"""
 import requests
 import datetime
 import time
@@ -655,7 +696,7 @@ class PulsarConnection:
 
     
 """
-# Test code
+# Snippets of test code for playing in python's command line
 
 import pulsar_wrapper
 my_pulsar = pulsar_wrapper.PulsarConnection()
