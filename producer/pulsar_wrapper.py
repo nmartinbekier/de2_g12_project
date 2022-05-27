@@ -543,9 +543,56 @@ class PulsarConnection:
         return True
     
     def process_partial_results(self, cutoff_date):
-        """ Process partial answers up to existing information. Publish top (not all)
-        committed repos to a special result topic, which will be further processed
-        by Pulsar Functions """
+        """ Process partial answers up to existing information and publish top
+        repos by commit number to a special result topic """
+        # Walk through current list of languages, and send them to 'aggregate_languages_info'
+        # topic to signal Pulsar Functions to report current counters
+        languages_topic = 'languages'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{languages_topic}",
+                reader_name=f'{languages_topic}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for 'languages' topic: {e} ***\n")
+            reader.close()
+            return        
+
+        language_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                language_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'languages': {e} ***\n")
+                break        
+        reader.close()
+        
+        # Publish current list language to 'aggregate_languages_info'. It will make Pulsar
+        # Functions work on them
+        try:
+            lang_result_topic = 'aggregate_languages_info'
+            lang_result_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{lang_result_topic}',
+                producer_name=f'{lang_result_topic}_prod',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating 'aggregate_languages_info' topic: {e} ***\n")
+            lang_result_producer.close()
+            return
+        
+        for lang in language_list:
+            try:
+                lang_result_producer.send((lang).encode('utf-8'))
+            except Exception as e:
+                print(f"\n*** Exception sending 'aggregate_languages_info' message: {e} ***\n")
+                lang_result_producer.close()
+                return
+        lang_result_producer.close()             
+        
         # Create a consumer on persistent topic with the commit information of repos
         # with unique name, so it always start from the beginning
         topic_name = 'commit_repo_info'
@@ -612,10 +659,12 @@ class PulsarConnection:
 
 import pulsar_wrapper
 my_pulsar = pulsar_wrapper.PulsarConnection()
+
 print(f"\nStill initializing: {my_pulsar.get_initializing()}")
 print(f"Already initialized: {my_pulsar.get_initialized()}\n")
 
 my_pulsar.get_day_to_process()
+
 my_pulsar.put_free_token("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")
 token = my_pulsar.get_free_token()
 
@@ -623,26 +672,33 @@ my_pulsar.load_all_git_tokens()
 
 # Test data
 repo_list = [
-    (1, 'owner_1', 'repo_1', 'language_1'),
-    (2, 'owner_2', 'repo_2', 'language_2'),
-    (3, 'owner_3', 'repo_3', 'language_1')]
+    (91, '9owner_511', '9repo_511', '9language_511'),
+    (92, '9owner_521', '9repo_521', '9language_512'),
+    (93, '9owner_531', '9repo_531', '9language_513')]
+my_pulsar.put_basic_repo_info(repo_list)
+
+
+    
+repos_with_tests_list = [(110, 'Python'),(111, 'C#'),(112, 'Javascript')]
+my_pulsar.put_repo_with_tests(repos_with_tests_list)
+
+
+repos_with_ci_list = [(10, 'Lisp'),(11, 'Java'),(12, 'Go')]
+my_pulsar.put_repo_with_ci(repos_with_ci_list)
+
+
+received_repo_list = my_pulsar.get_basic_repo_info(2)
+
 
 commit_repo_list = [
     (4, 16, 'owner_1', 'repo_1'),
     (5, 21, 'owner_2', 'repo_2'),
     (6, 26, 'owner_3', 'repo_3')]
-    
-repos_with_tests_list = [(1, 'Python'),(2, 'C#'),(3, 'Javascript')]
-repos_with_ci_list = [(10, 'Lisp'),(11, 'Java'),(12, 'Go')]
-
-my_pulsar.put_basic_repo_info(repo_list)
-received_repo_list = my_pulsar.get_basic_repo_info(2)
-
 my_pulsar.put_commit_repo_info(commit_repo_list)
 
-my_pulsar.put_repo_with_ci(repos_with_ci_list)
 
-my_pulsar.process_partial_results('2021-01-28')
+
+my_pulsar.process_partial_results('2021-01-29')
 
 my_pulsar.close()
 """
