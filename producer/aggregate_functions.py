@@ -8,6 +8,16 @@ $ bin/pulsar-admin functions create \
   --name aggregate_functions \
   --inputs persistent://public/default/basic_repo_info,persistent://public/default/repo_with_tests,persistent://public/static/repo_with_ci,persistent://public/static/aggregate_languages_info 
 
+Some counters and topics we're using:
+Global counters:
+- *repo_id* : a 1 indicates that the repository has already been reviewed
+- *repo_id*-tests : a 1 indicates that the repository has been reviewed for tests
+- *language*-repos: counts number of repositories in *language*
+- *language*-tests: counts number of repositories of *language* that use tests
+- *language*-ci: counts number of repositories of *language* that use ci/cd
+Result topics:
+- persistent://public/static/languages: keeps track of unique languages
+- persistent://public/static/language_results: aggregated information of each language
 """
 
 from pulsar import Function
@@ -44,17 +54,17 @@ class AggregateFunction(Function):
             repo_id = str(message[0])
             # repo_with_tests: (repo_id, 'language')
             repo_id_tests = f"{repo_id}-tests"
-            context.incr_counter(f'{repo_id_tets}', 1)
-            if (context.get_counter(f'{repo_id_tests}' == 1)):
+            context.incr_counter(f'{repo_id_tests}', 1)
+            if (context.get_counter(f'{repo_id_tests}') == 1):
                 # Increase counter if the repo hasn't been processed before for tests
-                language_tests = f"{message[2]}-tests"
+                language_tests = f"{message[1]}-tests"
                 context.incr_counter(f'{language_tests}', 1)
         elif 'repo_with_ci' in in_topic:
             message = eval(item)
             repo_id = str(message[0])
             # repo_wit_ci: (repo_id, 'language')
             # This time there's no need to check if the repo has been processed multiple times
-            language_ci = f"{message[2]}-ci"
+            language_ci = f"{message[1]}-ci"
             context.incr_counter(f'{language_ci}', 1)
         elif 'aggregate_languages_info' in in_topic:
             language = item
