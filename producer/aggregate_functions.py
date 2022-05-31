@@ -6,7 +6,7 @@ $ bin/pulsar-admin functions create \
   --tenant public \
   --namespace static \
   --name aggregate_functions \
-  --inputs persistent://public/default/basic_repo_info,persistent://public/default/repo_with_tests,persistent://public/static/repo_with_ci,persistent://public/static/aggregate_languages_info 
+  --inputs persistent://public/default/repos_for_commit_count,persistent://public/default/repo_with_tests,persistent://public/static/repo_with_ci,persistent://public/static/aggregate_languages_info 
 
 Some counters and topics we're using:
 Global counters:
@@ -35,7 +35,7 @@ class AggregateFunction(Function):
         logger.info(f"*** In topic: {context.get_current_message_topic_name()}")
         
         in_topic = context.get_current_message_topic_name()
-        if 'basic_repo_info' in in_topic:
+        if 'repos_for_commit_count' in in_topic:
             # basic_repo_info: (repo_id, 'owner', 'name', 'language')
             message = eval(item) # convert byte to text, and then to tuple
             repo_id = str(message[0])            

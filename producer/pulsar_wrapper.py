@@ -8,7 +8,7 @@ ex: my_pulsar = pulsar_wrapper.PulsarConnection(ip_address=192.168.##.##)
 
 Pulsar namespaces also have to be configured so topics behave as they are intended below.
 The following commands are needed for this, using pulsar-admin command line:
-$bin/pulsar-admin namespaces set-retention public/default --size 0 --time 0
+$bin/pulsar-admin namespaces set-retention public/default --size -1 --time -1
 $bin/pulsar-admin namespaces set-deduplication public/default --enable
 $bin/pulsar-admin namespaces create public/static
 $bin/pulsar-admin namespaces set-retention public/static --size -1 --time -1
@@ -774,10 +774,15 @@ my_pulsar.load_all_git_tokens()
 
 # Test data
 repo_list = [
-    (91, '9owner_511', '9repo_511', '9language_511'),
-    (92, '9owner_521', '9repo_521', '9language_512'),
-    (93, '9owner_531', '9repo_531', '9language_513')]
+    (7291, '3owner_511', '7repo_511', 'language1'),
+    (7292, '3owner_521', '7repo_521', 'language2'),
+    (7293, '3owner_531', '7repo_531', 'language3')]
 my_pulsar.put_basic_repo_info(repo_list)
+my_pulsar.get_repos_for_commit_count(num_repos=2)
+my_pulsar.get_repos_for_test_check(num_repos=2)
+get_repos_for_test_check(num_repos=2)
+
+
 
 
     
@@ -788,8 +793,6 @@ my_pulsar.put_repo_with_tests(repos_with_tests_list)
 repos_with_ci_list = [(10, 'Lisp'),(11, 'Java'),(12, 'Go')]
 my_pulsar.put_repo_with_ci(repos_with_ci_list)
 
-
-received_repo_list = my_pulsar.get_basic_repo_info(2)
 
 
 commit_repo_list = [
