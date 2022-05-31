@@ -409,64 +409,125 @@ class PulsarConnection:
     
     def put_basic_repo_info(self, repo_list):
         """ Publishes a series of (repo_id, 'owner', 'name', 'language') tuples in the
-        basic_repo_info topic"""
+        'repos_for_commit_count' and 'repos_for_test_check' topics. The same info gets
+        published in the two places to make the processing easier"""
+        
+        # Start publishing the info in 'repos_for_commit_count'
         try:
-            topic_name = 'basic_repo_info'
-            basic_repo_producer = self.client.create_producer(
+            topic_name = 'repos_for_commit_count'
+            repos_for_commit_producer = self.client.create_producer(
                 topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
                 producer_name=f'{topic_name}_prod',
                 message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
         except Exception as e:
-            print(f"\n*** Exception creating 'basic_repo_info' topic: {e} ***\n")
-            basic_repo_producer.close()
+            print(f"\n*** Exception creating 'repos_for_commit_count' topic: {e} ***\n")
+            repos_for_commit_producer.close()
             return
         
         for repo in repo_list:
             try:
-                basic_repo_producer.send((
+                repos_for_commit_producer.send((
                     f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
             except Exception as e:
-                print(f"\n*** Exception sending basic_repo_info message: {e} ***\n")
-                basic_repo_producer.close()
-                return
-            
-        basic_repo_producer.close()
+                print(f"\n*** Exception sending 'repos_for_commit_count' message: {e} ***\n")
+                repos_for_commit_producer.close()
+                return            
+        repos_for_commit_producer.close()
+        
+        # Now publish the same info in 'repos_for_commit_count'
+        try:
+            topic_name = 'repos_for_test_check'
+            repos_for_test_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating 'repos_for_test_check' topic: {e} ***\n")
+            repos_for_test_producer.close()
+            return
+        
+        for repo in repo_list:
+            try:
+                repos_for_test_producer.send((
+                    f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
+            except Exception as e:
+                print(f"\n*** Exception sending 'repos_for_test_check' message: {e} ***\n")
+                repos_for_test_producer.close()
+                return            
+        repos_for_test_producer.close()
+        
         return True
     
-    def get_basic_repo_info(self, num_repos):
+    def get_repos_for_commit_count(self, num_repos=1):
         """  pops a num_repos sized list with (repo id, 'owner', 'name', language') 
-        tuples from the topic basic_repo_info. Might have less elements if the
+        tuples from the topic 'repos_for_commit_count'. Might have less elements if the
         topic doesn't has more repos to return"""
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
-        topic_name = 'basic_repo_info'
+        topic_name = 'repos_for_commit_count'
         try:
-            basic_repo_info_consumer = self.client.subscribe(
+            repos_for_commit_consumer = self.client.subscribe(
                 topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
                 subscription_name=f'{topic_name}_sub',
                 initial_position=_pulsar.InitialPosition.Earliest)
         except Exception as e:
             print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
-            basic_repo_info_consumer.close()
+            repos_for_commit_consumer.close()
             return
         
         repo_list = []
         for i in range(num_repos):
             try:
                 # Give up to 3 seconds to receive an answer
-                msg = basic_repo_info_consumer.receive(timeout_millis=3000)
+                msg = repos_for_commit_consumer.receive(timeout_millis=3000)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
                 # Process message and append to repo_list
                 repo_list.append(eval(message))
                 # Acknowledge that the message was received          
-                basic_repo_info_consumer.acknowledge(msg)
+                repos_for_commit_consumer.acknowledge(msg)
             except Exception as e:
-                print(f"\n*** Exception receiving value from 'basic_repo_info': {e} ***")
+                print(f"\n*** Exception receiving value from 'repos_for_commit_count': {e} ***")
                 print("Might have reached the limit of available repos in the topic\n")
                 break
         
-        basic_repo_info_consumer.close()
+        repos_for_commit_consumer.close()
+        return repo_list
+
+    def get_repos_for_test_check(self, num_repos=1):
+        """  pops a num_repos sized list with (repo id, 'owner', 'name', language') 
+        tuples from the topic 'repos_for_test_check'. Might have less elements if the
+        topic doesn't has more repos to return"""
+        # Create a consumer on persistent topic, always using the same name,
+        # so it always references to the current read position
+        topic_name = 'repos_for_test_check'
+        try:
+            repos_for_test_check_consumer = self.client.subscribe(
+                topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
+                subscription_name=f'{topic_name}_sub',
+                initial_position=_pulsar.InitialPosition.Earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
+            repos_for_test_check_consumer.close()
+            return
+        
+        repo_list = []
+        for i in range(num_repos):
+            try:
+                # Give up to 3 seconds to receive an answer
+                msg = repos_for_test_check_consumer.receive(timeout_millis=3000)
+                # Save the string message (decode from byte value)
+                message = str(msg.value().decode())
+                # Process message and append to repo_list
+                repo_list.append(eval(message))
+                # Acknowledge that the message was received          
+                repos_for_test_check_consumer.acknowledge(msg)
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'repos_for_test_check': {e} ***")
+                print("Might have reached the limit of available repos in the topic\n")
+                break
+        
+        repos_for_test_check_consumer.close()
         return repo_list
 
     def put_commit_repo_info(self, repo_list):
