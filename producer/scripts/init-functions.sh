@@ -12,4 +12,4 @@ $PULSAR_ADMIN_PATH functions create \
   --tenant public \
   --namespace static \
   --name aggregate_functions \
-  --inputs persistent://public/default/basic_repo_info,persistent://public/default/repo_with_tests,persistent://public/static/repo_with_ci,persistent://public/static/aggregate_languages_info
+  --inputs persistent://public/default/repos_for_commit_count,persistent://public/default/repo_with_tests,persistent://public/static/repo_with_ci,persistent://public/static/aggregate_languages_info
