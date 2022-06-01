@@ -974,7 +974,7 @@ my_pulsar.put_commit_repo_info(commit_repo_list)
 
 
 
-my_pulsar.process_results('2021-01-30')
+my_pulsar.process_results('2021-01-01')
 
 my_pulsar.close()
 """
