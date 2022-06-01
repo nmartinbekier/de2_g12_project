@@ -32,10 +32,16 @@ def ensure_success(response: Response):
                     remaining = int(remaining_header)
                     if remaining < 1:
                         raise RateLimitException
-                except:
+                except ValueError:
                     pass
                     # Could not parse int from remaining_header, return invalid status code instead
                     # and do nothing in this except clause
+
+            data = response.json()
+            message = data.get('message') if data is not None else None
+            if message is not None and isinstance(message, str) and \
+                    message.startswith('You have exceeded'):
+                raise RateLimitException
 
         raise Exception(f"Received HTTP status code does not indicate success: {response.status_code}")
 
