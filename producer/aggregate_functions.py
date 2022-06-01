@@ -30,9 +30,9 @@ class AggregateFunction(Function):
     # This function gets called each time a day is published in
     # the topic: persistent://public/static/days_processed
     def process(self, item, context):
-        logger = context.get_logger()
-        logger.info(f"\n*** Message Content: {item}")
-        logger.info(f"*** In topic: {context.get_current_message_topic_name()}")
+        #logger = context.get_logger()
+        #logger.info(f"Message content: {item}")
+        #logger.info(f"*** In topic: {context.get_current_message_topic_name()}")
         
         in_topic = context.get_current_message_topic_name()
         if 'repos_for_commit_count' in in_topic:
