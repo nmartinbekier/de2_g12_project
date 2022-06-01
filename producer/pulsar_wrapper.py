@@ -20,8 +20,9 @@ Instructions for the command line instruction to start it are in 'aggregate_func
 This script uses the following topics. They can be listed, examined or deleted using
 'bin/pulsar-admin topics' commands
 
-Topics in public/default namespace (doesn't retain messages):
-persistent://public/default/basic_repo_info
+Topics in public/default namespace:
+persistent://public/default/repos_for_commit_count
+persistent://public/default/repos_for_test_check
 persistent://public/default/repo_with_tests
 persistent://public/default/day_to_process
 
@@ -32,7 +33,7 @@ persistent://public/static/free_token
 persistent://public/static/commit_repo_info
 persistent://public/static/repo_with_ci
 
-persistent://public/static/*YYYY-MM-DD*_partial_result_commit
+persistent://public/static/*YYYY-MM-DD*_result_commit
 persistent://public/static/aggregate_languages_info : signals Pulsar to compute results for this language
 persistent://public/static/languages : list of unique languages
 persistent://public/static/language_results : posts aggregated information of each language in tuples
@@ -280,13 +281,15 @@ class PulsarConnection:
             day_consumer.close()
             return
         
-        day_of_year = int(datetime.datetime.strptime(day, '%Y-%m-%d').strftime('%j'))
-        if (day_of_year%self.days_to_review == 0):
-            self.process_partial_results(day)
-        
         # If we reached the end, signal so we start sending None from next call on
         if day == '2021-12-31':
             self.last_day_processed = True
+        
+        # Every 'self.days_to_review' days, compute partial results
+        if (self.last_day_processed == False)
+            day_of_year = int(datetime.datetime.strptime(day, '%Y-%m-%d').strftime('%j'))
+            if (day_of_year%self.days_to_review == 0):
+                self.process_results(day)
         
         # Close at the end so no to block other processes that use the same subscription
         day_consumer.close()
@@ -644,9 +647,10 @@ class PulsarConnection:
         repo_with_ci_producer.close()
         return True
     
-    def process_partial_results(self, cutoff_date):
-        """ Process partial answers up to existing information and publish top
+    def process_results(self, cutoff_date='2021-12-31'):
+        """ Process answers up to existing information (at cutoff_date) and publish top
         repos by commit number to a special result topic """
+        
         # Walk through current list of languages, and send them to 'aggregate_languages_info'
         # topic to signal Pulsar Functions to report current counters
         languages_topic = 'languages'
@@ -659,7 +663,7 @@ class PulsarConnection:
         except Exception as e:
             print(f"\n*** Exception creating reader for 'languages' topic: {e} ***\n")
             reader.close()
-            return        
+            return
 
         language_list = []
         while reader.has_message_available():
@@ -670,7 +674,7 @@ class PulsarConnection:
                 language_list.append(str(msg.value().decode()))
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'languages': {e} ***\n")
-                break        
+                break
         reader.close()
         
         # Publish current list language to 'aggregate_languages_info'. It will make Pulsar
@@ -718,40 +722,63 @@ class PulsarConnection:
                 msg = reader.read_next(timeout_millis=400)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
-                repo_tuple = eval(message)
-                # Only add on list if bigger than lower_value
-                if (repo_tuple[1] > lower_value):
+                repo_tuple = eval(message)     
+                # If this is the last time processing results, add all values
+                if (cutoff_date=='2021-12-31'):
                     ord_list.add(RepoCommits(repo_tuple))
-                    # When exceeding size, take last element and update lower_value
-                    if (len(ord_list) > self.top_repos_partial_results):
-                        lower_value = ord_list.pop()[1]
+                else # Only add on list if bigger than lower_value     
+                    if (repo_tuple[1] > lower_value):
+                        ord_list.add(RepoCommits(repo_tuple))
+                        # When exceeding size, take last element and update lower_value
+                        if (len(ord_list) > self.top_repos_partial_results):
+                            lower_value = ord_list.pop()[1]
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'commit_repo_info': {e} ***\n")
                 break      
         reader.close()
         
-        # Now publish the results in a {cutoff_date}_partial_result_commit topic
+        # Now publish the results in a {cutoff_date}_result_commit topic
         try:
-            topic_name = f'{cutoff_date}_partial_result_commit'
-            partial_result_commit_producer = self.client.create_producer(
+            topic_name = f'{cutoff_date}_result_commit'
+            result_commit_producer = self.client.create_producer(
                 topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
                 producer_name=f'{topic_name}_prod',
                 message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
         except Exception as e:
-            print(f"\n*** Exception creating '{cutoff_date}_partial_result_commit' topic: {e} ***\n")
-            partial_result_commit_producer.close()
+            print(f"\n*** Exception creating '{cutoff_date}_result_commit' topic: {e} ***\n")
+            result_commit_producer.close()
             return
         
         for repo in ord_list.irange():
             try:
-                partial_result_commit_producer.send((
+                result_commit_producer.send((
                     f"({repo.ident}, {repo.commits}, '{repo.owner}', '{repo.repo_name}')").encode('utf-8'))
             except Exception as e:
                 print(f"\n*** Exception sending basic_repo_info message: {e} ***\n")
-                partial_result_commit_producer.close()
-                return
-            
-        partial_result_commit_producer.close()      
+                result_commit_producer.close()
+                return            
+        result_commit_producer.close()
+        
+        # Send a message to the 'initialized' topic sharing the cutoff date of the results
+        print("\n*** Reporting the cutoff date to the 'initialized' topic *** \n")
+        try:
+            curr_time = str(int(time.time()))
+            topic_name = 'initialized'
+            init_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod_{curr_time}',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception sending cutoff date to 'initialized': {e} ***\n")
+            init_producer.close()
+            return
+        
+        try:
+            init_producer.send((f'{cutoff_date}').encode('utf-8'))
+        except Exception as e:
+            print(f"\n*** Exception sending Initializing message: {e} ***\n")
+            init_producer.close()
+            return      
         
         return True
 
@@ -803,7 +830,7 @@ my_pulsar.put_commit_repo_info(commit_repo_list)
 
 
 
-my_pulsar.process_partial_results('2021-01-29')
+my_pulsar.process_results('2021-01-30')
 
 my_pulsar.close()
 """
