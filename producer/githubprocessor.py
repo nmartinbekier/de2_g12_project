@@ -263,5 +263,6 @@ class GithubProcessor:
             self.pulsar.put_free_token(token)
         except (RateLimitExceededException, RateLimitException):
             self.pulsar.put_standby_token(token)
+            return self.run_with_token(function)
 
         return result
