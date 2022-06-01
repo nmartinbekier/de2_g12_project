@@ -755,7 +755,7 @@ class PulsarConnection:
                 # If this is the last time processing results, add all values
                 if (cutoff_date=='2021-12-31'):
                     ord_list.add(RepoCommits(repo_tuple))
-                else # Only add on list if bigger than lower_value     
+                else: # Only add on list if bigger than lower_value     
                     if (repo_tuple[1] > lower_value):
                         ord_list.add(RepoCommits(repo_tuple))
                         # When exceeding size, take last element and update lower_value
