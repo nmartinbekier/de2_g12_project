@@ -286,7 +286,7 @@ class PulsarConnection:
             self.last_day_processed = True
         
         # Every 'self.days_to_review' days, compute partial results
-        if (self.last_day_processed == False)
+        if (self.last_day_processed == False):
             day_of_year = int(datetime.datetime.strptime(day, '%Y-%m-%d').strftime('%j'))
             if (day_of_year%self.days_to_review == 0):
                 self.process_results(day)
