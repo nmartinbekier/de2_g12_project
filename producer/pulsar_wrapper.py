@@ -651,6 +651,35 @@ class PulsarConnection:
         """ Process answers up to existing information (at cutoff_date) and publish top
         repos by commit number to a special result topic """
         
+        # Make sure the final processing hasn't been called before, by checking for a final
+        # '2021-12-31' message on the 'initialized' topic
+        init_topic = 'initialized'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
+                reader_name=f'{init_topic}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating final reader for 'initialized' topic: {e} ***\n")
+            reader.close()
+            return
+
+        init_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                init_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from final 'initialized' topic: {e} ***\n")
+                break
+        reader.close()
+        
+        # If the final day has already been processed, exit the method
+        if (init_list[-1] == '2021-12-31'): return False
+        
         # Walk through current list of languages, and send them to 'aggregate_languages_info'
         # topic to signal Pulsar Functions to report current counters
         languages_topic = 'languages'
