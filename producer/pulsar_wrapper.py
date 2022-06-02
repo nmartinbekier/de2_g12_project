@@ -8,7 +8,7 @@ ex: my_pulsar = pulsar_wrapper.PulsarConnection(ip_address=192.168.##.##)
 
 Pulsar namespaces also have to be configured so topics behave as they are intended below.
 The following commands are needed for this, using pulsar-admin command line:
-$bin/pulsar-admin namespaces set-retention public/default --size 0 --time 0
+$bin/pulsar-admin namespaces set-retention public/default --size -1 --time -1
 $bin/pulsar-admin namespaces set-deduplication public/default --enable
 $bin/pulsar-admin namespaces create public/static
 $bin/pulsar-admin namespaces set-retention public/static --size -1 --time -1
@@ -20,8 +20,9 @@ Instructions for the command line instruction to start it are in 'aggregate_func
 This script uses the following topics. They can be listed, examined or deleted using
 'bin/pulsar-admin topics' commands
 
-Topics in public/default namespace (doesn't retain messages):
-persistent://public/default/basic_repo_info
+Topics in public/default namespace:
+persistent://public/default/repos_for_commit_count
+persistent://public/default/repos_for_test_check
 persistent://public/default/repo_with_tests
 persistent://public/default/day_to_process
 
@@ -32,7 +33,7 @@ persistent://public/static/free_token
 persistent://public/static/commit_repo_info
 persistent://public/static/repo_with_ci
 
-persistent://public/static/*YYYY-MM-DD*_partial_result_commit
+persistent://public/static/*YYYY-MM-DD*_result_commit
 persistent://public/static/aggregate_languages_info : signals Pulsar to compute results for this language
 persistent://public/static/languages : list of unique languages
 persistent://public/static/language_results : posts aggregated information of each language in tuples
@@ -280,13 +281,15 @@ class PulsarConnection:
             day_consumer.close()
             return
         
-        day_of_year = int(datetime.datetime.strptime(day, '%Y-%m-%d').strftime('%j'))
-        if (day_of_year%self.days_to_review == 0):
-            self.process_partial_results(day)
-        
         # If we reached the end, signal so we start sending None from next call on
         if day == '2021-12-31':
             self.last_day_processed = True
+        
+        # Every 'self.days_to_review' days, compute partial results
+        if (self.last_day_processed == False):
+            day_of_year = int(datetime.datetime.strptime(day, '%Y-%m-%d').strftime('%j'))
+            if (day_of_year%self.days_to_review == 0):
+                self.process_results(day)
         
         # Close at the end so no to block other processes that use the same subscription
         day_consumer.close()
@@ -409,64 +412,125 @@ class PulsarConnection:
     
     def put_basic_repo_info(self, repo_list):
         """ Publishes a series of (repo_id, 'owner', 'name', 'language') tuples in the
-        basic_repo_info topic"""
+        'repos_for_commit_count' and 'repos_for_test_check' topics. The same info gets
+        published in the two places to make the processing easier"""
+        
+        # Start publishing the info in 'repos_for_commit_count'
         try:
-            topic_name = 'basic_repo_info'
-            basic_repo_producer = self.client.create_producer(
+            topic_name = 'repos_for_commit_count'
+            repos_for_commit_producer = self.client.create_producer(
                 topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
                 producer_name=f'{topic_name}_prod',
                 message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
         except Exception as e:
-            print(f"\n*** Exception creating 'basic_repo_info' topic: {e} ***\n")
-            basic_repo_producer.close()
+            print(f"\n*** Exception creating 'repos_for_commit_count' topic: {e} ***\n")
+            repos_for_commit_producer.close()
             return
         
         for repo in repo_list:
             try:
-                basic_repo_producer.send((
+                repos_for_commit_producer.send((
                     f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
             except Exception as e:
-                print(f"\n*** Exception sending basic_repo_info message: {e} ***\n")
-                basic_repo_producer.close()
-                return
-            
-        basic_repo_producer.close()
+                print(f"\n*** Exception sending 'repos_for_commit_count' message: {e} ***\n")
+                repos_for_commit_producer.close()
+                return            
+        repos_for_commit_producer.close()
+        
+        # Now publish the same info in 'repos_for_commit_count'
+        try:
+            topic_name = 'repos_for_test_check'
+            repos_for_test_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception creating 'repos_for_test_check' topic: {e} ***\n")
+            repos_for_test_producer.close()
+            return
+        
+        for repo in repo_list:
+            try:
+                repos_for_test_producer.send((
+                    f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
+            except Exception as e:
+                print(f"\n*** Exception sending 'repos_for_test_check' message: {e} ***\n")
+                repos_for_test_producer.close()
+                return            
+        repos_for_test_producer.close()
+        
         return True
     
-    def get_basic_repo_info(self, num_repos):
+    def get_repos_for_commit_count(self, num_repos=1):
         """  pops a num_repos sized list with (repo id, 'owner', 'name', language') 
-        tuples from the topic basic_repo_info. Might have less elements if the
+        tuples from the topic 'repos_for_commit_count'. Might have less elements if the
         topic doesn't has more repos to return"""
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
-        topic_name = 'basic_repo_info'
+        topic_name = 'repos_for_commit_count'
         try:
-            basic_repo_info_consumer = self.client.subscribe(
+            repos_for_commit_consumer = self.client.subscribe(
                 topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
                 subscription_name=f'{topic_name}_sub',
                 initial_position=_pulsar.InitialPosition.Earliest)
         except Exception as e:
             print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
-            basic_repo_info_consumer.close()
+            repos_for_commit_consumer.close()
             return
         
         repo_list = []
         for i in range(num_repos):
             try:
                 # Give up to 3 seconds to receive an answer
-                msg = basic_repo_info_consumer.receive(timeout_millis=3000)
+                msg = repos_for_commit_consumer.receive(timeout_millis=3000)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
                 # Process message and append to repo_list
                 repo_list.append(eval(message))
                 # Acknowledge that the message was received          
-                basic_repo_info_consumer.acknowledge(msg)
+                repos_for_commit_consumer.acknowledge(msg)
             except Exception as e:
-                print(f"\n*** Exception receiving value from 'basic_repo_info': {e} ***")
+                print(f"\n*** Exception receiving value from 'repos_for_commit_count': {e} ***")
                 print("Might have reached the limit of available repos in the topic\n")
                 break
         
-        basic_repo_info_consumer.close()
+        repos_for_commit_consumer.close()
+        return repo_list
+
+    def get_repos_for_test_check(self, num_repos=1):
+        """  pops a num_repos sized list with (repo id, 'owner', 'name', language') 
+        tuples from the topic 'repos_for_test_check'. Might have less elements if the
+        topic doesn't has more repos to return"""
+        # Create a consumer on persistent topic, always using the same name,
+        # so it always references to the current read position
+        topic_name = 'repos_for_test_check'
+        try:
+            repos_for_test_check_consumer = self.client.subscribe(
+                topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
+                subscription_name=f'{topic_name}_sub',
+                initial_position=_pulsar.InitialPosition.Earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
+            repos_for_test_check_consumer.close()
+            return
+        
+        repo_list = []
+        for i in range(num_repos):
+            try:
+                # Give up to 3 seconds to receive an answer
+                msg = repos_for_test_check_consumer.receive(timeout_millis=3000)
+                # Save the string message (decode from byte value)
+                message = str(msg.value().decode())
+                # Process message and append to repo_list
+                repo_list.append(eval(message))
+                # Acknowledge that the message was received          
+                repos_for_test_check_consumer.acknowledge(msg)
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'repos_for_test_check': {e} ***")
+                print("Might have reached the limit of available repos in the topic\n")
+                break
+        
+        repos_for_test_check_consumer.close()
         return repo_list
 
     def put_commit_repo_info(self, repo_list):
@@ -583,9 +647,39 @@ class PulsarConnection:
         repo_with_ci_producer.close()
         return True
     
-    def process_partial_results(self, cutoff_date):
-        """ Process partial answers up to existing information and publish top
+    def process_results(self, cutoff_date='2021-12-31'):
+        """ Process answers up to existing information (at cutoff_date) and publish top
         repos by commit number to a special result topic """
+        
+        # Make sure the final processing hasn't been called before, by checking for a final
+        # '2021-12-31' message on the 'initialized' topic
+        init_topic = 'initialized'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
+                reader_name=f'{init_topic}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating final reader for 'initialized' topic: {e} ***\n")
+            reader.close()
+            return
+
+        init_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                init_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from final 'initialized' topic: {e} ***\n")
+                break
+        reader.close()
+        
+        # If the final day has already been processed, exit the method
+        if (init_list[-1] == '2021-12-31'): return False
+        
         # Walk through current list of languages, and send them to 'aggregate_languages_info'
         # topic to signal Pulsar Functions to report current counters
         languages_topic = 'languages'
@@ -598,7 +692,7 @@ class PulsarConnection:
         except Exception as e:
             print(f"\n*** Exception creating reader for 'languages' topic: {e} ***\n")
             reader.close()
-            return        
+            return
 
         language_list = []
         while reader.has_message_available():
@@ -609,7 +703,7 @@ class PulsarConnection:
                 language_list.append(str(msg.value().decode()))
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'languages': {e} ***\n")
-                break        
+                break
         reader.close()
         
         # Publish current list language to 'aggregate_languages_info'. It will make Pulsar
@@ -657,43 +751,181 @@ class PulsarConnection:
                 msg = reader.read_next(timeout_millis=400)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
-                repo_tuple = eval(message)
-                # Only add on list if bigger than lower_value
-                if (repo_tuple[1] > lower_value):
+                repo_tuple = eval(message)     
+                # If this is the last time processing results, add all values
+                if (cutoff_date=='2021-12-31'):
                     ord_list.add(RepoCommits(repo_tuple))
-                    # When exceeding size, take last element and update lower_value
-                    if (len(ord_list) > self.top_repos_partial_results):
-                        lower_value = ord_list.pop()[1]
+                else: # Only add on list if bigger than lower_value     
+                    if (repo_tuple[1] > lower_value):
+                        ord_list.add(RepoCommits(repo_tuple))
+                        # When exceeding size, take last element and update lower_value
+                        if (len(ord_list) > self.top_repos_partial_results):
+                            lower_value = ord_list.pop()[1]
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'commit_repo_info': {e} ***\n")
                 break      
         reader.close()
         
-        # Now publish the results in a {cutoff_date}_partial_result_commit topic
+        # Now publish the results in a {cutoff_date}_result_commit topic, with tuples in a
+        # (id_repo, num_commits, 'repo_owner', 'repo_name') format
         try:
-            topic_name = f'{cutoff_date}_partial_result_commit'
-            partial_result_commit_producer = self.client.create_producer(
+            topic_name = f'{cutoff_date}_result_commit'
+            result_commit_producer = self.client.create_producer(
                 topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
                 producer_name=f'{topic_name}_prod',
                 message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
         except Exception as e:
-            print(f"\n*** Exception creating '{cutoff_date}_partial_result_commit' topic: {e} ***\n")
-            partial_result_commit_producer.close()
+            print(f"\n*** Exception creating '{cutoff_date}_result_commit' topic: {e} ***\n")
+            result_commit_producer.close()
             return
         
         for repo in ord_list.irange():
             try:
-                partial_result_commit_producer.send((
+                result_commit_producer.send((
                     f"({repo.ident}, {repo.commits}, '{repo.owner}', '{repo.repo_name}')").encode('utf-8'))
             except Exception as e:
                 print(f"\n*** Exception sending basic_repo_info message: {e} ***\n")
-                partial_result_commit_producer.close()
-                return
-            
-        partial_result_commit_producer.close()      
+                result_commit_producer.close()
+                return            
+        result_commit_producer.close()
+        
+        # Send a message to the 'initialized' topic sharing the cutoff date of the results
+        print("\n*** Reporting the cutoff date to the 'initialized' topic *** \n")
+        try:
+            curr_time = str(int(time.time()))
+            topic_name = 'initialized'
+            init_producer = self.client.create_producer(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                producer_name=f'{topic_name}_prod_{curr_time}',
+                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+        except Exception as e:
+            print(f"\n*** Exception sending cutoff date to 'initialized': {e} ***\n")
+            init_producer.close()
+            return
+        
+        try:
+            init_producer.send((f'{cutoff_date}').encode('utf-8'))
+        except Exception as e:
+            print(f"\n*** Exception sending Initializing message: {e} ***\n")
+            init_producer.close()
+            return      
         
         return True
 
+    def get_current_cuttoff_date(self):
+        """ Receives the 'YYYY-MM-DD' of the last processed information. If 
+        it is '2021-12-31' it means all has already been processed """    
+
+        # This info is kept in the 'initialized' topic
+        init_topic = 'initialized'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
+                reader_name=f'{init_topic}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for 'initialized' topic: {e} ***\n")
+            return
+
+        message_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                message_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'initialized' topic: {e} ***\n")
+                break
+        reader.close()
+
+        return message_list[-1]
+
+    def get_top_commits(self, num_values=10):
+        """ Function to fetch the top num_values commit results. It assumes messages are
+        ordered and in the tuple format: (id_repo, num_commits, 'repo_owner', 'repo_name').
+        It returns a num_values list of tuples of the form ('repo_name', num_commits) """
+
+        curr_time = str(int(time.time()))
+        cutoff_date = self.get_current_cuttoff_date()
+
+        # Check if there are available results. cutoff_date should have
+        # length 10 string ('YYYY-MM-DD')
+        if (len(cutoff_date) != 10):
+            print(f"\n*** It seems there are still no results. Received '{cutoff_date}' as cutoff value ***\n")
+            return
+
+        if (cutoff_date == '2021-12-31'):
+            print("\n*** Showing final results (all info has been processed) ***\n")
+        else:
+            print(f"\n*** Showing partial results up to {cutoff_date} (info is still being processed) ***\n")
+
+        # The results are kept in the {cutoff-date}_result_commit' topic
+        topic_name = f"{cutoff_date}_result_commit"
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                reader_name=f'{topic_name}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for '{cutoff_date}_result_commit' topic: {e} ***\n")
+            reader.close()
+            return
+
+        result_list = []
+        while (reader.has_message_available() and len(result_list)<num_values):
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                result_tuple = eval(str(msg.value().decode()))
+                repo_name = f"{result_tuple[2]}/{result_tuple[3]}"
+                result_list.append((repo_name, result_tuple[1]))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from '{cutoff_date}_result_commit' topic: {e} ***\n")
+                break
+        reader.close()
+
+        return result_list    
+    
+    def get_languages_stats(self):
+        """ Receives current aggregated information of languages in a list made of tuples
+        ('language', num_repos, num_tests, num_cis). Returns a dictionary with the consolidated
+        information, with language as key"""
+
+        curr_time = str(int(time.time()))
+
+        # The results are kept in the 'public/static/language_results' topic
+        topic_name = 'language_results'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                reader_name=f'{topic_name}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for 'language_results' topic: {e} ***\n")
+            reader.close()
+            return
+
+        result_dict = {}
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                result_tuple = eval(str(msg.value().decode()))
+                result_dict[result_tuple[0]]={'num_repos': result_tuple[1],
+                                  'num_tests': result_tuple[2],
+                                  'num_ci': result_tuple[3]}
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'initialized' topic: {e} ***\n")
+                break
+        reader.close()
+
+        return result_dict
     
 """
 # Snippets of test code for playing in python's command line
@@ -713,10 +945,15 @@ my_pulsar.load_all_git_tokens()
 
 # Test data
 repo_list = [
-    (91, '9owner_511', '9repo_511', '9language_511'),
-    (92, '9owner_521', '9repo_521', '9language_512'),
-    (93, '9owner_531', '9repo_531', '9language_513')]
+    (7291, '3owner_511', '7repo_511', 'language1'),
+    (7292, '3owner_521', '7repo_521', 'language2'),
+    (7293, '3owner_531', '7repo_531', 'language3')]
 my_pulsar.put_basic_repo_info(repo_list)
+my_pulsar.get_repos_for_commit_count(num_repos=2)
+my_pulsar.get_repos_for_test_check(num_repos=2)
+get_repos_for_test_check(num_repos=2)
+
+
 
 
     
@@ -728,8 +965,6 @@ repos_with_ci_list = [(10, 'Lisp'),(11, 'Java'),(12, 'Go')]
 my_pulsar.put_repo_with_ci(repos_with_ci_list)
 
 
-received_repo_list = my_pulsar.get_basic_repo_info(2)
-
 
 commit_repo_list = [
     (4, 16, 'owner_1', 'repo_1'),
@@ -739,7 +974,7 @@ my_pulsar.put_commit_repo_info(commit_repo_list)
 
 
 
-my_pulsar.process_partial_results('2021-01-29')
+my_pulsar.process_results('2021-01-01')
 
 my_pulsar.close()
 """

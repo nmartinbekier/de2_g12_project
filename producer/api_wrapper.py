@@ -3,7 +3,12 @@ import uuid
 from typing import List, Dict
 
 import requests
+from github import RateLimitExceededException
 from requests import Response
+
+
+class RateLimitException(Exception):
+    pass
 
 
 def find_property(tree: Dict, path: List[str]):
@@ -19,6 +24,28 @@ def find_property(tree: Dict, path: List[str]):
 
 def ensure_success(response: Response):
     if not response.ok:
+        if response.status_code == 403:
+            remaining_header = response.headers.get('X-RateLimit-Remaining')
+
+            if remaining_header is not None:
+                try:
+                    remaining = int(remaining_header)
+                    if remaining < 1:
+                        raise RateLimitException
+                except ValueError:
+                    pass
+                    # Could not parse int from remaining_header, return invalid status code instead
+                    # and do nothing in this except clause
+
+            data = response.json()
+            message = data.get('message') if data is not None else None
+            if message is not None and isinstance(message, str) and \
+                    message.startswith('You have exceeded'):
+                raise RateLimitException
+            
+        if response.status_code == 401:
+            raise RateLimitException
+
         raise Exception(f"Received HTTP status code does not indicate success: {response.status_code}")
 
 
@@ -30,10 +57,13 @@ class RepoName:
         self.uuid = uuid.uuid4()
 
     def __str__(self):
-        return f"{self.owner}/{self.name}"
+        return self.full_name()
 
     def __repr__(self):
-        return f"{self.owner}/{self.name}"
+        return self.full_name()
+
+    def full_name(self):
+        return f'{self.owner}/{self.name}'
 
 
 class RepoStats:
@@ -60,15 +90,51 @@ class RepoStats:
         }
 
 
-class Github:
+class RepoFile:
+    def __init__(self, name: str, path: str):
+        self.name = name
+        self.path = path
+
+    def __str__(self):
+        return f"{self.name}: ({self.path})"
+
+    def __repr__(self):
+        return f"{self.name}: ({self.path})"
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "path": self.path
+        }
+
+
+class RateLimit:
+    def __init__(self, core: int, search: int, graphql: int):
+        self.core = core
+        self.search = search
+        self.graphql = graphql
+
+    def is_exceeded(self):
+        limits = [
+            self.core,
+            self.search,
+            self.graphql
+        ]
+
+        return any(map(lambda remaining: remaining < 1, limits))
+
+
+class GithubWrapper:
     def __init__(self,
                  auth_tokens: List[str],
                  graphql_url: str = 'https://graphql.github.com',
-                 repositories_url: str = 'https://api.github.com/repositories'):
+                 repositories_url: str = 'https://api.github.com/repositories',
+                 search_url: str = 'https://api.github.com/search/code'):
         self.tokens = auth_tokens
         self.query_template = open("repo_query.graphql", "r").read()
         self.graphql_url = graphql_url
         self.repositories_url = repositories_url
+        self.search_url = search_url
 
     @staticmethod
     def read_tokens_from_file(file_path: str):
@@ -80,6 +146,55 @@ class Github:
     def get_repos_with_stats(self, start_index: int = 0):
         repos = self.get_repos(start_index)
         return self.get_stats(repos)
+
+    @staticmethod
+    def get_rate_limit(token: str) -> RateLimit:
+        headers = {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': 'bearer ' + token
+        }
+
+        response = requests.get(
+            'https://api.github.com/rate_limit',
+            headers=headers)
+
+        ensure_success(response)
+        res = response.json()['resources']
+
+        return RateLimit(
+            core=res['core']['remaining'],
+            search=res['search']['remaining'],
+            graphql=res['graphql']['remaining']
+        )
+
+    def get_files(self, repo_name: RepoName, file_names) -> List[RepoFile]:
+        headers = {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': 'bearer ' + self.get_token()
+        }
+
+        params = {
+            'q': f'repo:{repo_name.owner}/{repo_name.name}' +
+                 ''.join(map(lambda name: ' filename:' + name, file_names))
+        }
+
+        response = requests.get(
+            self.search_url,
+            headers=headers,
+            params=params)
+
+        ensure_success(response)
+
+        search_result = response.json()
+        results = []
+
+        for file in search_result['items']:
+            results.append(RepoFile(
+                name=file['name'],
+                path=file['path']
+            ))
+
+        return results
 
     def get_repos(self, start_index: int = 0):
         headers = {
@@ -109,7 +224,7 @@ class Github:
 
         return results
 
-    def get_stats(self, repos: List[RepoName]):
+    def get_stats(self, repos: List[RepoName]) -> Dict[str, RepoStats]:
         # GraphQL used for this is from the following stackoverflow thread:
         # https://stackoverflow.com/questions/27931139/how-to-use-github-v3-api-to-get-commit-count-for-a-repo
         headers = {
@@ -183,7 +298,7 @@ class Github:
 
 class RepoEnumerator:
     def __init__(self,
-                 api: Github,
+                 api: GithubWrapper,
                  start_index: int,
                  end_index: int,
                  step_size: int):
