@@ -121,7 +121,7 @@ class GithubProcessor:
 
         repos = list(take(count, self \
                           ._create_pyapi(token) \
-                          .search_repositories(query=f'created:{day}')))
+                          .search_repositories(query=f'created:{day} sort:stars')))
 
         basic_repo_info = list(map(
             lambda repo: (
