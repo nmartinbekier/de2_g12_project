@@ -38,7 +38,7 @@
       owner: ubuntu
       group: ubuntu
 
-- hosts: prodserver
+- hosts: worker1server
  
   vars_files:
    - setup_var.yml  
@@ -112,7 +112,231 @@
    #  args: 
    #   chdir: home/ubuntu/de2_g12_project/ 
 
-- hosts: conserver
+- hosts: worker2server
+ 
+  vars_files:
+   - setup_var.yml
+
+  tasks:
+   - name: Extra packages
+     apt: pkg={{item}} state=latest update_cache=true
+     with_items:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   - name: Add Docker repository key
+     apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+     become: true
+
+   - name: Add Docker repository
+     command: add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   # Workaround pip issue with MTU mismatch, see: https://github.com/docker/docker.github.io/pull/9249/files
+   # MTU for SNIC is 1450, Docker default is 1500. Override so that Docker matches the host.
+   # We create the config file before installing, to avoid any need to restart the docker daemon.
+   - name: Create Ansible docker config directory.
+     become: true
+     file:
+       path: "/etc/docker"
+       state: directory
+
+   - name: Create Ansible docker file to configure Docker MTU to match SNIC for pip issue
+     become: true
+     copy:
+       dest: "/etc/docker/daemon.json"
+       content: |
+        {
+          "mtu": 1450
+        }
+
+   - name: Install Docker
+     apt: pkg=docker-ce state=present update_cache=true allow_unauthenticated=yes
+     become: true
+
+    - name: Download docker-compose
+     become: yes
+     get_url:
+      url: "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-{{ansible_system}}-{{ansible_architecture}}"
+      dest: /usr/local/bin/docker-compose
+      mode: +x
+
+   #- name: Building containers
+   #  become: true
+   #  shell: docker build .
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/producer.py
+
+   #- name: Running containers
+   #  become: true
+   #  shell: docker-compose up -d 
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/ 
+
+- hosts: worker3server
+ 
+  vars_files:
+   - setup_var.yml
+
+  tasks:
+   - name: Extra packages
+     apt: pkg={{item}} state=latest update_cache=true
+     with_items:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   - name: Add Docker repository key
+     apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+     become: true
+
+   - name: Add Docker repository
+     command: add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   # Workaround pip issue with MTU mismatch, see: https://github.com/docker/docker.github.io/pull/9249/files
+   # MTU for SNIC is 1450, Docker default is 1500. Override so that Docker matches the host.
+   # We create the config file before installing, to avoid any need to restart the docker daemon.
+   - name: Create Ansible docker config directory.
+     become: true
+     file:
+       path: "/etc/docker"
+       state: directory
+
+   - name: Create Ansible docker file to configure Docker MTU to match SNIC for pip issue
+     become: true
+     copy:
+       dest: "/etc/docker/daemon.json"
+       content: |
+        {
+          "mtu": 1450
+        }
+
+   - name: Install Docker
+     apt: pkg=docker-ce state=present update_cache=true allow_unauthenticated=yes
+     become: true
+
+    - name: Download docker-compose
+     become: yes
+     get_url:
+      url: "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-{{ansible_system}}-{{ansible_architecture}}"
+      dest: /usr/local/bin/docker-compose
+      mode: +x
+
+   #- name: Building containers
+   #  become: true
+   #  shell: docker build .
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/producer.py
+
+   #- name: Running containers
+   #  become: true
+   #  shell: docker-compose up -d 
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/ 
+
+- hosts: worker4server
+ 
+  vars_files:
+   - setup_var.yml
+
+  tasks:
+   - name: Extra packages
+     apt: pkg={{item}} state=latest update_cache=true
+     with_items:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   - name: Add Docker repository key
+     apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+     become: true
+
+   - name: Add Docker repository
+     command: add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   # Workaround pip issue with MTU mismatch, see: https://github.com/docker/docker.github.io/pull/9249/files
+   # MTU for SNIC is 1450, Docker default is 1500. Override so that Docker matches the host.
+   # We create the config file before installing, to avoid any need to restart the docker daemon.
+   - name: Create Ansible docker config directory.
+     become: true
+     file:
+       path: "/etc/docker"
+       state: directory
+
+   - name: Create Ansible docker file to configure Docker MTU to match SNIC for pip issue
+     become: true
+     copy:
+       dest: "/etc/docker/daemon.json"
+       content: |
+        {
+          "mtu": 1450
+        }
+
+   - name: Install Docker
+     apt: pkg=docker-ce state=present update_cache=true allow_unauthenticated=yes
+     become: true
+
+    - name: Download docker-compose
+     become: yes
+     get_url:
+      url: "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-{{ansible_system}}-{{ansible_architecture}}"
+      dest: /usr/local/bin/docker-compose
+      mode: +x
+
+   #- name: Building containers
+   #  become: true
+   #  shell: docker build .
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/producer.py
+
+   #- name: Running containers
+   #  become: true
+   #  shell: docker-compose up -d 
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/ 
+
+
+
+- hosts: clientserver
   
   vars_files:
    - setup_var.yml
@@ -132,3 +356,25 @@
    #  shell: docker-compose up -d 
    #  args: 
    #   chdir: /home/ubuntu/de2_g12_project
+
+- hosts: serverserver
+
+  vars_files:
+   - setup_var.yml
+
+  tasks:
+   - name: Extra packages
+     apt: pkg=python3-pip state=latest update_cache=true
+     become: true
+   #- name: Building containers
+   #  become: true
+   #  shell: docker build .
+   #  args: 
+   #   chdir: home/ubuntu/de2_g12_project/consumer.py
+
+   #- name: Running containers
+   #  become: true
+   #  shell: docker-compose up -d 
+   #  args: 
+   #   chdir: /home/ubuntu/de2_g12_project
+
