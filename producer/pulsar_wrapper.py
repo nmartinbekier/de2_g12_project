@@ -560,12 +560,12 @@ class PulsarConnection:
         return True
     
     def put_repo_with_tests(self, repo_list):
-        """ Publishes a series of (repo_id, 'language') tuples in the
+        """ Publishes a series of (repo_id, 'repo_owner', 'repo_name', 'language') tuples in the
         repo_with_tests topic """
         try:
             topic_name = 'repo_with_tests'
             repo_with_tests_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                topic¢=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
                 producer_name=f'{topic_name}_prod',
                 message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
         except Exception as e:
@@ -576,7 +576,7 @@ class PulsarConnection:
         for repo in repo_list:
             try:
                 repo_with_tests_producer.send((
-                    f"({repo[0]}, '{repo[1]}')").encode('utf-8'))      
+                    f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}' )").encode('utf-8'))      
             except Exception as e:
                 print(f"\n*** Exception sending repo_with_tests message: {e} ***\n")
                 repo_with_tests_producer.close()
@@ -586,8 +586,8 @@ class PulsarConnection:
         return True
     
     def get_repo_with_tests(self, num_repos):
-        """  pops a num_repos sized list with (repo_id, 'language') tuples
-        from the topic repo_with_tests. Might have less elements if the
+        """  pops a num_repos sized list with (repo_id, 'repo_owner', 'repo_name', 'language')
+        tuples from the topic repo_with_tests. Might have less elements if the
         topic doesn't has more repos to return """
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
