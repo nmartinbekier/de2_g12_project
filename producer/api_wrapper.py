@@ -166,7 +166,7 @@ class GithubWrapper:
         try:
             ensure_success(response)
         except UnauthorizedException:
-            print(f'401 unauthorized http status using token \"{self.get_token()}\". Bad token?')
+            print(f'401 unauthorized http status using token \"{token}\". Bad token?')
             raise
 
         res = response.json()['resources']
