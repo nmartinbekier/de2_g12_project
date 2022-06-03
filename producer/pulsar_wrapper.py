@@ -481,8 +481,8 @@ class PulsarConnection:
         repo_list = []
         for i in range(num_repos):
             try:
-                # Give up to 3 seconds to receive an answer
-                msg = repos_for_commit_consumer.receive(timeout_millis=3000)
+                # Give up to half a second to receive an answer
+                msg = repos_for_commit_consumer.receive(timeout_millis=500)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
                 # Process message and append to repo_list
@@ -517,8 +517,8 @@ class PulsarConnection:
         repo_list = []
         for i in range(num_repos):
             try:
-                # Give up to 3 seconds to receive an answer
-                msg = repos_for_test_check_consumer.receive(timeout_millis=3000)
+                # Give up to 300 milliseconds to receive an answer
+                msg = repos_for_test_check_consumer.receive(timeout_millis=300)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
                 # Process message and append to repo_list
@@ -605,8 +605,8 @@ class PulsarConnection:
         repo_list = []
         for i in range(num_repos):
             try:
-                # Give up to 3 seconds to receive an answer
-                msg = repo_with_tests_consumer.receive(timeout_millis=3000)
+                # Give up to 200 milliseconds to receive an answer
+                msg = repo_with_tests_consumer.receive(timeout_millis=200)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
                 # Process message and append to repo_list
@@ -668,8 +668,8 @@ class PulsarConnection:
         init_list = []
         while reader.has_message_available():
             try:
-                # Give up to 400 milliseconds to receive an answer
-                msg = reader.read_next(timeout_millis=400)
+                # Give up to 600 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=600)
                 # Save the string message (decode from byte value)
                 init_list.append(str(msg.value().decode()))
             except Exception as e:
@@ -760,7 +760,7 @@ class PulsarConnection:
                         ord_list.add(RepoCommits(repo_tuple))
                         # When exceeding size, take last element and update lower_value
                         if (len(ord_list) > self.top_repos_partial_results):
-                            lower_value = ord_list.pop()[1]
+                            lower_value = ord_list.pop().commits
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'commit_repo_info': {e} ***\n")
                 break      
@@ -878,7 +878,7 @@ class PulsarConnection:
         while (reader.has_message_available() and len(result_list)<num_values):
             try:
                 # Give up to 400 milliseconds to receive an answer
-                msg = reader.read_next(timeout_millis=400)
+                msg = reader.read_next(timeout_millis=700)
                 # Save the string message (decode from byte value)
                 result_tuple = eval(str(msg.value().decode()))
                 repo_name = f"{result_tuple[2]}/{result_tuple[3]}"
