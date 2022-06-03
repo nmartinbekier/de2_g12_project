@@ -54,7 +54,7 @@ class RepoCommits(object):
     """ Data Type to support tuple in-place sorting using sortedcontainers """
     def __init__(self, repo_tuple):
         self.ident = repo_tuple[0]
-        self.commits = repo_tuple[1]
+        self.commits = int(repo_tuple[1] or 0)
         self.owner = repo_tuple[2]
         self.repo_name = repo_tuple[3]
         
@@ -306,16 +306,19 @@ class PulsarConnection:
     
     def put_free_token(self, token):
         """ Posts a token id string with available quota """
-        try:
-            topic_name = 'free_token'
-            free_token_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'free_token' topic: {e} ***\n")
-            free_token_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'free_token'
+                free_token_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'free_token' topic: {e} ***\nRetrying in 5s..\n")
+                time.sleep(5)
+                #free_token_producer.close()
+                return
        
         try:
             free_token_producer.send((
@@ -644,9 +647,9 @@ class PulsarConnection:
             return
         
         for repo in repo_list:
-            try:
+            try: # repo[3] has the language
                 repo_with_ci_producer.send((
-                    f"({repo[0]}, '{repo[1]}')").encode('utf-8'))      
+                    f"({repo[0]}, '{repo[3]}')").encode('utf-8'))      
             except Exception as e:
                 print(f"\n*** Exception sending 'repo_with_ci_producer' message: {e} ***\n")
                 repo_with_ci_producer.close()
@@ -763,8 +766,9 @@ class PulsarConnection:
                 # If this is the last time processing results, add all values
                 if (cutoff_date=='2021-12-31'):
                     ord_list.add(RepoCommits(repo_tuple))
-                else: # Only add on list if bigger than lower_value     
-                    if (repo_tuple[1] > lower_value):
+                else: # Only add on list if bigger than lower_value
+                    num_commits = int(repo_tuple[1] or 0)
+                    if (num_commits > lower_value):
                         ord_list.add(RepoCommits(repo_tuple))
                         # When exceeding size, take last element and update lower_value
                         if (len(ord_list) > self.top_repos_partial_results):

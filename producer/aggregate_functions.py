@@ -64,13 +64,13 @@ class AggregateFunction(Function):
             repo_id = str(message[0])
             # repo_wit_ci: (repo_id, 'owner', 'name', 'language')
             # This time there's no need to check if the repo has been processed multiple times
-            language_ci = f"{message[3]}-ci"
+            language_ci = f"{message[1]}-ci"
             context.incr_counter(f'{language_ci}', 1)
         elif 'aggregate_languages_info' in in_topic:
             language = item
-            num_repos = context.get_counter(f"{language}-repos")
-            num_tests = context.get_counter(f"{language}-tests")
-            num_cis = context.get_counter(f"{language}-ci")
+            num_repos = int(context.get_counter(f"{language}-repos") or 0)
+            num_tests = int(context.get_counter(f"{language}-tests") or 0)
+            num_cis = int(context.get_counter(f"{language}-ci") or 0)
             # Create a tuple with all info to publish
             # ('language', num_repos, num_tests, num_cis)
             lang_tuple = f"('{language}', {num_repos}, {num_tests}, {num_cis})"
