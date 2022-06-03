@@ -12,6 +12,10 @@ class RateLimitException(Exception):
     pass
 
 
+class UnauthorizedException(Exception):
+    pass
+
+
 def find_property(tree: Dict, path: List[str]):
     result = tree
     for way in path:
@@ -45,7 +49,7 @@ def ensure_success(response: Response):
                 raise RateLimitException
             
         if response.status_code == 401:
-            raise RateLimitException
+            raise UnauthorizedException
 
         raise Exception(f"Received HTTP status code does not indicate success: {response.status_code}")
 
@@ -161,9 +165,9 @@ class GithubWrapper:
 
         try:
             ensure_success(response)
-        except RateLimitException:
-            time.sleep(1)
-            return GithubWrapper.get_rate_limit(token)
+        except UnauthorizedException:
+            print(f'401 unauthorized http status using token \"{self.get_token()}\". Bad token?')
+            raise
 
         res = response.json()['resources']
 
@@ -189,7 +193,11 @@ class GithubWrapper:
             headers=headers,
             params=params)
 
-        ensure_success(response)
+        try:
+            ensure_success(response)
+        except UnauthorizedException:
+            print(f'401 unauthorized http status using token \"{self.get_token()}\". Bad token?')
+            raise
 
         search_result = response.json()
         results = []
@@ -216,7 +224,11 @@ class GithubWrapper:
             headers=headers,
             params=params)
 
-        ensure_success(response)
+        try:
+            ensure_success(response)
+        except UnauthorizedException:
+            print(f'401 unauthorized http status using token \"{self.get_token()}\". Bad token?')
+            raise
 
         repo_list = response.json()
         results = []
@@ -267,7 +279,11 @@ class GithubWrapper:
         response = requests.post('https://api.github.com/graphql', headers=headers,
                                  json=json_data)
 
-        ensure_success(response)
+        try:
+            ensure_success(response)
+        except UnauthorizedException:
+            print(f'401 unauthorized http status using token \"{self.get_token()}\". Bad token?')
+            raise
 
         response_dict = response.json()
         result_dict = response_dict["data"]
