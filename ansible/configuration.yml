@@ -364,17 +364,75 @@
 
   tasks:
    - name: Extra packages
-     apt: pkg=python3-pip state=latest update_cache=true
+     apt: pkg={{item}} state=latest update_cache=true
+     with_items:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
      become: true
-   #- name: Building containers
-   #  become: true
-   #  shell: docker build .
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/consumer.py
 
-   #- name: Running containers
-   #  become: true
-   #  shell: docker-compose up -d 
-   #  args: 
-   #   chdir: /home/ubuntu/de2_g12_project
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
 
+   - name: Add Docker repository key
+     apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+     become: true
+
+   - name: Add Docker repository
+     command: add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+     become: true
+
+   - name: apt update
+     apt: update_cache=yes upgrade=dist
+     become: true
+
+   # Workaround pip issue with MTU mismatch, see: https://github.com/docker/docker.github.io/pull/9249/files
+   # MTU for SNIC is 1450, Docker default is 1500. Override so that Docker matches the host.
+   # We create the config file before installing, to avoid any need to restart the docker daemon.
+   - name: Create Ansible docker config directory.
+     become: true
+     file:
+       path: "/etc/docker"
+       state: directory
+
+   - name: Create Ansible docker file to configure Docker MTU to match SNIC for pip issue
+     become: true
+     copy:
+       dest: "/etc/docker/daemon.json"
+       content: |
+        {
+          "mtu": 1450
+        }
+
+   - name: Install Docker
+     apt: pkg=docker-ce state=present update_cache=true allow_unauthenticated=yes
+     become: true
+
+   - name: Download docker-compose
+     become: yes
+     get_url:
+      url: "https://github.com/docker/compose/releases/download/1.24.0/docker-compose-{{ansible_system}}-{{ansible_architecture}}"
+      dest: /usr/local/bin/docker-compose
+      mode: +x
+
+   - name: Initialize main.py on pulsar server
+     become: true
+     
+     command: export pulsar_host=localhost
+     command: export debug=false
+     command: python3 /$HOME/de2_g12_project/producer/main.py
+   
+   - name: Run start script on pulsar server
+     # Run pulsar in standalone mode as a docker container, exposing the appropriate ports and mounting some dirs
+     command: docker run -p 6650:6650  -p 8080:8080 --mount source=pulsardata,target=/pulsar/data --mount source=pulsarconf,target=/pulsar/conf apachepulsar/pulsar:2.9.1 bin/pulsar standalone
+
+     # Sleep for a minute to ensure pulsar has started before initializing it. 
+     # There are probably more efficient ways of knowing when its started though
+     command: sleep 1m
+
+     # Initialize pulsar with the functions and namespaces required for the producer/consumer
+     command: /$HOME/./de2_g12_project/producer/scripts/init-pulsar.sh
