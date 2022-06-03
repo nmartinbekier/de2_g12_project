@@ -252,7 +252,7 @@ class GithubProcessor:
         )
 
         if files is not None and len(files) > 0:
-            consumer([(repo_id, language)])
+            consumer([(repo_id, owner, name, language)])
 
     def run_with_token(self, function: Callable[[str], bool]) -> bool:
         token = self._get_token()
