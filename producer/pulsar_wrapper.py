@@ -565,7 +565,7 @@ class PulsarConnection:
         try:
             topic_name = 'repo_with_tests'
             repo_with_tests_producer = self.client.create_producer(
-                topic¢=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
                 producer_name=f'{topic_name}_prod',
                 message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
         except Exception as e:
