@@ -331,15 +331,17 @@ class PulsarConnection:
     def get_free_token(self):
         """ pops the string of an available token """
         topic_name = 'free_token'
-        try:
-            free_token_consumer = self.client.subscribe(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                subscription_name=f'{topic_name}_sub',
-                initial_position=_pulsar.InitialPosition.Earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating free_token_consumer: {e} ***\n")
-            free_token_consumer.close()
-            return None
+        while True:
+            try:
+                free_token_consumer = self.client.subscribe(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                    subscription_name=f'{topic_name}_sub',
+                    initial_position=_pulsar.InitialPosition.Earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating free_token_consumer: {e} ***\nRetrying in 5s...\n")
+                time.sleep(5)
+                #free_token_consumer.close()
         
         try:
             # Give up to half a second to receive an answer
@@ -360,15 +362,18 @@ class PulsarConnection:
     def put_standby_token(self, token):
         """ posts a token id string from a token with exhausted quota """
         topic_name = 'standby_token'
-        try:
-            standby_token_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'standby_token' topic: {e} ***\n")
-            standby_token_producer.close()
-            return
+        while True:
+            try:
+                standby_token_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'standby_token' topic: {e} ***\nRetrying in 5s...\n")
+                time.sleep(5)
+                #standby_token_producer.close()
+                return
        
         try:
             standby_token_producer.send((
@@ -376,7 +381,7 @@ class PulsarConnection:
         except Exception as e:
             print(f"\n*** Exception sending standby_token message: {e} ***\n")
             standby_token_producer.close()
-            return
+            return False
             
         standby_token_producer.close()
         return True
@@ -384,15 +389,18 @@ class PulsarConnection:
     def get_standby_token(self):
         """  pops the string of a standby token """
         topic_name = 'standby_token'
-        try:
-            standby_token_consumer = self.client.subscribe(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                subscription_name=f'{topic_name}_sub',
-                initial_position=_pulsar.InitialPosition.Earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating standby_token_consumer: {e} ***\n")
-            standby_token_consumer.close()
-            return None
+        while True:
+            try:
+                standby_token_consumer = self.client.subscribe(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                    subscription_name=f'{topic_name}_sub',
+                    initial_position=_pulsar.InitialPosition.Earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating standby_token_consumer: {e} ***\nRetrying in 5s...\n")
+                time.sleep(5)
+                #standby_token_consumer.close()
+                return None
         
         try:
             # Give up to half a second to receive an answer
