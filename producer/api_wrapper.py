@@ -122,7 +122,7 @@ class RateLimit:
             self.graphql
         ]
 
-        return any(map(lambda remaining: remaining < 1, limits))
+        return any(map(lambda remaining: remaining < 5, limits))
 
 
 class GithubWrapper:
