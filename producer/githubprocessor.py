@@ -1,3 +1,4 @@
+import random
 import time
 from typing import Callable, Optional, List, Tuple
 
@@ -20,6 +21,9 @@ class GithubProcessor:
         self.pulsar = pulsar
         self.no_token_sleep = no_token_sleep
         self.verbose = verbose
+        self.repos_with_test_counter = 0
+        self.ci_override_chance = 0.15
+        self.random = random.Random()
 
         self.ci_files = [
             '.travis.yml',
@@ -185,6 +189,10 @@ class GithubProcessor:
         return self.run_with_token(self._analyze_repo_ci)
 
     def _analyze_repo_ci(self, token: str) -> bool:
+        if self.repos_with_test_counter < 1 and self.random.random() > self.ci_override_chance:
+            self._log(f"{__name__}: skipping analyzing ci, found 0 repos previously and random failed")
+            return False
+
         self._log(f"{__name__}: attempting to analyze repo ci")
         status = self._get_and_query_repo(
             token=token,
@@ -193,12 +201,16 @@ class GithubProcessor:
             output=self.pulsar.put_repo_with_ci
         )
 
-        if status:
+        if status > 0:
             self._log(f"{__name__}: analyzed ci for at least one repo")
+            self.repos_with_test_counter -= status
+
+            if self.repos_with_test_counter < 1:
+                self.repos_with_test_counter = 0
         else:
             self._log(f"{__name__}: no repos to analyze ci for")
 
-        return status
+        return status > 0
 
     def analyze_repo_tests(self) -> bool:
         return self.run_with_token(self._analyze_repo_tests)
@@ -212,23 +224,24 @@ class GithubProcessor:
             output=self.pulsar.put_repo_with_tests
         )
 
-        if status:
+        if status > 0:
             self._log(f"{__name__}: analyzed tests for at least one repo")
+            self.repos_with_test_counter += status
         else:
             self._log(f"{__name__}: no repos to analyze tests for")
 
-        return status
+        return status > 0
 
     def _get_and_query_repo(self,
                             token: str,
                             retriever: Callable[[int], List],
                             query_files: List[str],
                             output: Callable[[List], None],
-                            batch_size: int = 1) -> bool:
+                            batch_size: int = 1) -> int:
         repos = retriever(batch_size)
 
         if repos is None or len(repos) < 1:
-            return False
+            return 0
 
         for repo in repos:
             self._query_repo(
@@ -238,7 +251,7 @@ class GithubProcessor:
                 consumer=output
             )
 
-        return True
+        return len(repos)
 
     def _query_repo(self,
                     token: str,
