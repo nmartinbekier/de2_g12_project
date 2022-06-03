@@ -42,6 +42,9 @@ def ensure_success(response: Response):
             if message is not None and isinstance(message, str) and \
                     message.startswith('You have exceeded'):
                 raise RateLimitException
+            
+        if response.status_code == 401:
+            raise RateLimitException
 
         raise Exception(f"Received HTTP status code does not indicate success: {response.status_code}")
 

@@ -766,7 +766,8 @@ class PulsarConnection:
                 break      
         reader.close()
         
-        # Now publish the results in a {cutoff_date}_result_commit topic
+        # Now publish the results in a {cutoff_date}_result_commit topic, with tuples in a
+        # (id_repo, num_commits, 'repo_owner', 'repo_name') format
         try:
             topic_name = f'{cutoff_date}_result_commit'
             result_commit_producer = self.client.create_producer(
@@ -811,6 +812,120 @@ class PulsarConnection:
         
         return True
 
+    def get_current_cuttoff_date(self):
+        """ Receives the 'YYYY-MM-DD' of the last processed information. If 
+        it is '2021-12-31' it means all has already been processed """    
+
+        # This info is kept in the 'initialized' topic
+        init_topic = 'initialized'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
+                reader_name=f'{init_topic}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for 'initialized' topic: {e} ***\n")
+            return
+
+        message_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                message_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'initialized' topic: {e} ***\n")
+                break
+        reader.close()
+
+        return message_list[-1]
+
+    def get_top_commits(self, num_values=10):
+        """ Function to fetch the top num_values commit results. It assumes messages are
+        ordered and in the tuple format: (id_repo, num_commits, 'repo_owner', 'repo_name').
+        It returns a num_values list of tuples of the form ('repo_name', num_commits) """
+
+        curr_time = str(int(time.time()))
+        cutoff_date = self.get_current_cuttoff_date()
+
+        # Check if there are available results. cutoff_date should have
+        # length 10 string ('YYYY-MM-DD')
+        if (len(cutoff_date) != 10):
+            print(f"\n*** It seems there are still no results. Received '{cutoff_date}' as cutoff value ***\n")
+            return
+
+        if (cutoff_date == '2021-12-31'):
+            print("\n*** Showing final results (all info has been processed) ***\n")
+        else:
+            print(f"\n*** Showing partial results up to {cutoff_date} (info is still being processed) ***\n")
+
+        # The results are kept in the {cutoff-date}_result_commit' topic
+        topic_name = f"{cutoff_date}_result_commit"
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                reader_name=f'{topic_name}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for '{cutoff_date}_result_commit' topic: {e} ***\n")
+            reader.close()
+            return
+
+        result_list = []
+        while (reader.has_message_available() and len(result_list)<num_values):
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                result_tuple = eval(str(msg.value().decode()))
+                repo_name = f"{result_tuple[2]}/{result_tuple[3]}"
+                result_list.append((repo_name, result_tuple[1]))
+            except Exception as e:
+                print(f"\n*** Exception receiving value from '{cutoff_date}_result_commit' topic: {e} ***\n")
+                break
+        reader.close()
+
+        return result_list    
+    
+    def get_languages_stats(self):
+        """ Receives current aggregated information of languages in a list made of tuples
+        ('language', num_repos, num_tests, num_cis). Returns a dictionary with the consolidated
+        information, with language as key"""
+
+        curr_time = str(int(time.time()))
+
+        # The results are kept in the 'public/static/language_results' topic
+        topic_name = 'language_results'
+        curr_time = str(int(time.time()))
+        try:
+            reader = self.client.create_reader(
+                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                reader_name=f'{topic_name}_sub_{curr_time}',
+                start_message_id=MessageId.earliest)
+        except Exception as e:
+            print(f"\n*** Exception creating reader for 'language_results' topic: {e} ***\n")
+            reader.close()
+            return
+
+        result_dict = {}
+        while reader.has_message_available():
+            try:
+                # Give up to 400 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=400)
+                # Save the string message (decode from byte value)
+                result_tuple = eval(str(msg.value().decode()))
+                result_dict[result_tuple[0]]={'num_repos': result_tuple[1],
+                                  'num_tests': result_tuple[2],
+                                  'num_ci': result_tuple[3]}
+            except Exception as e:
+                print(f"\n*** Exception receiving value from 'initialized' topic: {e} ***\n")
+                break
+        reader.close()
+
+        return result_dict
     
 """
 # Snippets of test code for playing in python's command line
@@ -859,7 +974,7 @@ my_pulsar.put_commit_repo_info(commit_repo_list)
 
 
 
-my_pulsar.process_results('2021-01-30')
+my_pulsar.process_results('2021-01-01')
 
 my_pulsar.close()
 """
