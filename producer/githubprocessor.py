@@ -75,6 +75,8 @@ class GithubProcessor:
         # in order to be able to re-add them as standby
         tokens = GithubProcessor._get_all_tokens(self.pulsar.get_standby_token)
         result = False
+        fails = 0
+        successes = 0
 
         try:
             # Duplicate list to allow for removing elements
@@ -85,14 +87,19 @@ class GithubProcessor:
                 if limit.is_exceeded():
                     # Rate limit is exceeded, put it back in standby
                     self.pulsar.put_standby_token(token)
+                    fails += 1
                 else:
                     # No rate limit is exceeded, put token in free
                     self.pulsar.put_free_token(token)
+                    successes += 1
                     tokens.remove(token)
                     result = True
 
+            self._log(f"{__name__}: token check status: {fails} out of {fails + successes} tokens still expired.")
+
             return result
         except:
+            self._log(f"{__name__}: exception when checking tokens")
             # Re-add tokens still in list in case of exception
             for token in tokens:
                 self.pulsar.put_standby_token(token)
@@ -111,7 +118,7 @@ class GithubProcessor:
     def read_repos(self):
         return self.run_with_token(self._read_repos)
 
-    def _read_repos(self, token: str, count: int = 100) -> bool:
+    def _read_repos(self, token: str, count: int = 1000) -> bool:
         self._log(f"{__name__}: attempting to read repos")
         day = self.pulsar.get_day_to_process()
 
@@ -255,14 +262,14 @@ class GithubProcessor:
             consumer([(repo_id, owner, name, language)])
 
     def run_with_token(self, function: Callable[[str], bool]) -> bool:
-        token = self._get_token()
         result = False
+        token = self._get_token()
 
-        try:
-            result = function(token)
-            self.pulsar.put_free_token(token)
-        except (RateLimitExceededException, RateLimitException):
-            self.pulsar.put_standby_token(token)
-            return self.run_with_token(function)
-
-        return result
+        while True:
+            try:
+                result = function(token)
+                self.pulsar.put_free_token(token)
+                return result
+            except (RateLimitExceededException, RateLimitException):
+                if token is not None:
+                    self.pulsar.put_standby_token(token)

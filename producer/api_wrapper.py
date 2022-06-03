@@ -1,4 +1,5 @@
 import random
+import time
 import uuid
 from typing import List, Dict
 
@@ -158,7 +159,12 @@ class GithubWrapper:
             'https://api.github.com/rate_limit',
             headers=headers)
 
-        ensure_success(response)
+        try:
+            ensure_success(response)
+        except RateLimitException:
+            time.sleep(1)
+            return GithubWrapper.get_rate_limit(token)
+
         res = response.json()['resources']
 
         return RateLimit(
