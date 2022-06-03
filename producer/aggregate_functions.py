@@ -52,19 +52,19 @@ class AggregateFunction(Function):
         elif 'repo_with_tests' in in_topic:
             message = eval(item)
             repo_id = str(message[0])
-            # repo_with_tests: (repo_id, 'language')
+            # repo_with_tests: (repo_id, 'owner', 'name', 'language')
             repo_id_tests = f"{repo_id}-tests"
             context.incr_counter(f'{repo_id_tests}', 1)
             if (context.get_counter(f'{repo_id_tests}') == 1):
                 # Increase counter if the repo hasn't been processed before for tests
-                language_tests = f"{message[1]}-tests"
+                language_tests = f"{message[3]}-tests"
                 context.incr_counter(f'{language_tests}', 1)
         elif 'repo_with_ci' in in_topic:
             message = eval(item)
             repo_id = str(message[0])
-            # repo_wit_ci: (repo_id, 'language')
+            # repo_wit_ci: (repo_id, 'owner', 'name', 'language')
             # This time there's no need to check if the repo has been processed multiple times
-            language_ci = f"{message[1]}-ci"
+            language_ci = f"{message[3]}-ci"
             context.incr_counter(f'{language_ci}', 1)
         elif 'aggregate_languages_info' in in_topic:
             language = item
