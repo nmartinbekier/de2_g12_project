@@ -99,6 +99,11 @@ class PulsarConnection:
         A first 'Initializing' message is because its starting, and a second
         'Initialized' message is because it has already started
         """
+        
+        # Load tokens (workaround to loading them through Pulsar)
+        self.token_list = [token.split("#")[0].strip() for token in open(
+            "tokens.txt", "r").readlines()]
+        
         try:
             has_messages = False
             curr_time = str(int(time.time()))
@@ -137,10 +142,6 @@ class PulsarConnection:
             self.initializing = False
         reader.close()
         
-        # Load tokens (workaround to loading them through Pulsar)
-        self.token_list = [token.split("#")[0].strip() for token in open(
-            "tokens.txt", "r").readlines()]
-        
         return True
 
     def _initialize_pulsar(self):
@@ -177,7 +178,7 @@ class PulsarConnection:
         self.initializing = True
             
         self.create_day_to_process() # Creates 365 days in 'day_to_process' topic
-        self.load_all_git_tokens() # Loads 4 tokens in 'free_token'
+        #self.load_all_git_tokens() # Loads 4 tokens in 'free_token'
         
         try:
             init_producer.send(("Initialized").encode('utf-8'))      
@@ -220,22 +221,7 @@ class PulsarConnection:
         return True
         
     def load_all_git_tokens(self):
-        """ Flush tokens in 'free_token' and 'standby_token' and load all
-        again in 'free_token' """
-        
-        while True:
-            token = self.get_free_token()
-            if token == None: break
-        
-        # while True:            
-            #token = self.get_standby_token()
-            #if token == None: break
-            
-        token_list = [token.split("#")[0].strip() for token in open(
-            "tokens.txt", "r").readlines()]
-        
-        for token in token_list:
-            self.put_free_token(token)
+        """ Updated: now just using a token list """
             
         return True
     
@@ -283,8 +269,8 @@ class PulsarConnection:
                 break
             except Exception as e:
                 print(f"\n*** Exception creating day_consumer: {e} ***\n")
-                print(f"Waiting 4 secs until its liberated")
-                time.sleep(4)
+                print(f"Waiting 1 secs until its liberated")
+                time.sleep(1)
                 #day_consumer.close()
             
         try:
@@ -418,6 +404,10 @@ class PulsarConnection:
         
         for repo in repo_list:
             try:
+                # Remove apostrophes
+                repo = list(repo)
+                for count, value in enumerate(repo):
+                    if isinstance(value, str): repo[count] = value.replace("'", "")
                 repos_for_commit_producer.send((
                     f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
             except Exception as e:
@@ -440,6 +430,10 @@ class PulsarConnection:
         
         for repo in repo_list:
             try:
+                # Remove apostrophes
+                repo = list(repo)
+                for count, value in enumerate(repo):
+                    if isinstance(value, str): repo[count] = value.replace("'", "")
                 repos_for_test_producer.send((
                     f"({repo[0]}, '{repo[1]}', '{repo[2]}', '{repo[3]}')").encode('utf-8'))      
             except Exception as e:
@@ -466,8 +460,8 @@ class PulsarConnection:
                 break
             except Exception as e:
                 print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
-                print("Waiting 4 seconds to retry")
-                time.sleep(4)
+                print("Waiting 1 seconds to retry")
+                time.sleep(1)
         
         repo_list = []
         for i in range(num_repos):
@@ -484,7 +478,7 @@ class PulsarConnection:
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'repos_for_commit_count': {e} ***")
                 print("Might have reached the limit of available repos in the topic\n")
-                print(f"Message received: {message}")
+                #print(f"Message received: {message}")
                 break
         
         repos_for_commit_consumer.close()
@@ -506,8 +500,8 @@ class PulsarConnection:
                 break
             except Exception as e:
                 print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
-                print("Waiting 4 secs to retry")
-                time.sleep(4)
+                print("Waiting 1 secs to retry")
+                time.sleep(1)
         
         repo_list = []
         for i in range(num_repos):
@@ -523,7 +517,6 @@ class PulsarConnection:
                 repos_for_test_check_consumer.acknowledge(msg)
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'repos_for_test_check': {e} ***")
-                print(f"Message received: {message}")
                 print("Might have reached the limit of available repos in the topic\n")
                 break
         
@@ -598,8 +591,8 @@ class PulsarConnection:
                 break
             except Exception as e:
                 print(f"\n*** Exception creating repo_with_tests: {e} ***\n")
-                print("Waiting 4 secs to retry")
-                time.sleep(4)
+                print("Waiting 1 sec to retry")
+                time.sleep(1)
         
         repo_list = []
         for i in range(num_repos):
