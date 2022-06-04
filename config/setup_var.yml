@@ -1,0 +1,6 @@
+worker1_home: /producer 
+worker2_home: /producer 
+worker3_home: /producer
+worker4_home: /producer
+client_home: /producer
+server_home: /producer

@@ -1,0 +1,47 @@
+#cloud-config
+#cloud-config
+apt_update: true
+apt_upgrade: true
+packages:
+ - ca-certificates
+ - curl
+ - software-properties-common
+ - gnupg
+ - lsb-release
+ - python3-pip
+ - python3-dev
+ - build-essential
+ - default-jre
+
+byobu_default: system
+
+users:
+ - name: ubuntu
+   sudo: ALL=(ALL) NOPASSWD:ALL
+   home: /home/ubuntu
+   shell: /bin/bash
+   ssh_authorized_keys:
+     - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC1/S7R2//BE7WGa6atB4/oFl2rkBuodfyrk6BICoNk6r4Qj95DQP7js4eH7ZSYE4yhFzIeRkqXN9QARYK2fhsgdRg+KmpqZViHpvDHAifzoJSiCSPOoqLMUlFTYTSoYleQ6ffEeuBIW4R4paqpSSMShlwEkQ6OX41Amys8t1kH/k49E7pPY6dx2/n+SYcMIVbNE+VLZCfku8oN/1dKWiyLMF3NegA4Q/ryER9HGC/qPpqCwG4oUAiTnVQE75HXHCD9jfmK8v0UeISi0tlY5VyIQ695+1XuEHY305h9+vQmRa1Ne3fi7epXeals4Qq/HOJD1iYSD2/brpQ1LJ1gYxcs3lmb6JXHrGDLfTBoSSuXWp+x4Iy64DHlR0j9u/5Xv8v4oBkQ7BAILNpWr8Y2QdKBt7gSR1Dj+3in9QpXQn4dJzCRaySOG1/+tqMeZwm4S7BHWrd2CtQ0ah4H79k5ySz7biVpNfGtWY81eZojU5OKeZutn4cWos8xSro5xmVuoRs= ubuntu@olledelborg-dev
+     - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+JRNMKGnXFFHmO1KYF9I3OEgLSY5whGT5H2DYhdLLiCk789DEB0243EUpzJAOg15lLq8rV5asfrijKMjWWGUhTJUJQq/wczdYMWfzydntRqlpyaeN+Owi5milSQl/QWfFM3JiqOQgb7QQ7lnOkTCdqE/2WbR8CzMpfhQBr8oNV1y6/T6HlveSNGJQNYgod3qdqUkJsV3GTC06oIQw/ajMsxSzBdeVRYZ17MYwLu9pJzeX4ick4s2GPJDhmjeE3kOHZ6hOR20PbDBEVmYJSjOm0yk2aXcgBk5j3veUIysw2yymmrWFnX+S+nZV4Gzr+el6tUw/LRMNp/5vr/dObxN1 Generated-by-Nova
+     # here the clients public should be replaced by above
+     # the clients key should preferably be located at
+     # "~/cluster-keys/cluster-key.pub"
+
+
+     # the clients key should preferably be located at
+     # "~/cluster-keys/cluster-key.pub"
+
+runcmd:
+ - pip3 install pulsar-client==2.10.0
+ - pip3 install pulsar-client[functions]=='2.10.0'
+ - echo "adding docker repo"
+ - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+ - add-apt-repository -y "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+ - apt-get update -y
+ - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+ - echo "adding docker-compose"
+ - curl -SL https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+ - chmod +x /usr/local/bin/docker-compose
+ - wget https://archive.apache.org/dist/pulsar/pulsar-2.10.0/apache-pulsar-2.10.0-bin.tar.gz
+ - tar xvfz apache-pulsar-2.10.0-bin.tar.gz
+ - mv apache-pulsar-2.10.0 apache-pulsar
