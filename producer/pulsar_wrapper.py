@@ -198,16 +198,18 @@ class PulsarConnection:
         """ Keeps track of which days have been processed so far (each day with a
         ‘YYYY-MM-DD’ format). Useful to compute partial ‘global’ results every
         certain time by Pulsar Functions. """
-        try:
-            topic_name = 'days_processed'
-            days_processed_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'days_processed' topic: {e} ***\n")
-            days_processed_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'days_processed'
+                days_processed_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'days_processed' topic: {e} ***\n")
+                print("Retrying in 1 second")
+                time.sleep(1)
        
         try:
             days_processed_producer.send((
@@ -230,15 +232,18 @@ class PulsarConnection:
         To be called automatically while initializing, but also making it externally
         available for test purposes """
         print("\n*** Populating 'day_to_process' topic ***\n")
-        try:
-            topic_name = 'day_to_process'
-            day_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'day_to_process' topic: {e} ***\n")
-            day_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'day_to_process'
+                day_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'day_to_process' topic: {e} ***\n")
+                print("Waiting 1 second..")
+                time.sleep(1)
+        
         init_date = datetime.datetime(2021, 1, 1)
         dates = [(init_date + datetime.timedelta(days=idx)).strftime('%Y-%m-%d') for idx in range(365)]
         
@@ -256,7 +261,7 @@ class PulsarConnection:
         """ Pops a ‘YYYY-MM-DD’ string value from the topic 'day_to_process'.
         If there are no more days to process, returns None (Null) """
         if self.last_day_processed: return None
-    
+        
         topic_name = 'day_to_process'
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
@@ -391,16 +396,19 @@ class PulsarConnection:
         published in the two places to make the processing easier"""
         
         # Start publishing the info in 'repos_for_commit_count'
-        try:
-            topic_name = 'repos_for_commit_count'
-            repos_for_commit_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'repos_for_commit_count' topic: {e} ***\n")
-            repos_for_commit_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'repos_for_commit_count'
+                repos_for_commit_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'repos_for_commit_count' topic: {e} ***\n")
+                print("Retrying in 1 second")
+                time.sleep(1)
+                #repos_for_commit_producer.close()
         
         for repo in repo_list:
             try:
@@ -417,16 +425,18 @@ class PulsarConnection:
         repos_for_commit_producer.close()
         
         # Now publish the same info in 'repos_for_commit_count'
-        try:
-            topic_name = 'repos_for_test_check'
-            repos_for_test_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'repos_for_test_check' topic: {e} ***\n")
-            repos_for_test_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'repos_for_test_check'
+                repos_for_test_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'repos_for_test_check' topic: {e} ***\n")
+                print("Retrying in 1 second")
+                time.sleep(1)
         
         for repo in repo_list:
             try:
@@ -526,16 +536,18 @@ class PulsarConnection:
     def put_commit_repo_info(self, repo_list):
         """ Publishes a series of (repo_id, num_commits, 'repo_owner', 'repo_name') tuples in the
         commit_repo_info topic"""
-        try:
-            topic_name = 'commit_repo_info'
-            commit_repo_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'commit_repo_info' topic: {e} ***\n")
-            commit_repo_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'commit_repo_info'
+                commit_repo_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'commit_repo_info' topic: {e} ***\n")
+                print("Waiting 1 sec")
+                time.sleep(1)
         
         for repo in repo_list:
             try:
@@ -552,16 +564,18 @@ class PulsarConnection:
     def put_repo_with_tests(self, repo_list):
         """ Publishes a series of (repo_id, 'repo_owner', 'repo_name', 'language') tuples in the
         repo_with_tests topic """
-        try:
-            topic_name = 'repo_with_tests'
-            repo_with_tests_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'repo_with_tests' topic: {e} ***\n")
-            repo_with_tests_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'repo_with_tests'
+                repo_with_tests_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'repo_with_tests' topic: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
         
         for repo in repo_list:
             try:
@@ -617,16 +631,18 @@ class PulsarConnection:
     def put_repo_with_ci(self, repo_list):
         """ Publishes a series of (repo_id, 'language') tuples in the
         repo_with_ci topic """
-        try:
-            topic_name = 'repo_with_ci'
-            repo_with_ci_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'repo_with_ci_producer' topic: {e} ***\n")
-            repo_with_ci_producer.close()
-            return
+        while True:
+            try:
+                topic_name = 'repo_with_ci'
+                repo_with_ci_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'repo_with_ci_producer' topic: {e} ***\n")
+                print("Waiting 1 sec")
+                time.sleep(1)
         
         for repo in repo_list:
             try: # repo[3] has the language
@@ -648,15 +664,17 @@ class PulsarConnection:
         # '2021-12-31' message on the 'initialized' topic
         init_topic = 'initialized'
         curr_time = str(int(time.time()))
-        try:
-            reader = self.client.create_reader(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
-                reader_name=f'{init_topic}_sub_{curr_time}',
-                start_message_id=MessageId.earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating final reader for 'initialized' topic: {e} ***\n")
-            reader.close()
-            return
+        while True:
+            try:
+                reader = self.client.create_reader(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
+                    reader_name=f'{init_topic}_sub_{curr_time}',
+                    start_message_id=MessageId.earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating final reader for 'initialized' topic: {e} ***\n")
+                print("Waiting 1 sec")
+                time.sleep(1)
 
         init_list = []
         while reader.has_message_available():
@@ -677,15 +695,17 @@ class PulsarConnection:
         # topic to signal Pulsar Functions to report current counters
         languages_topic = 'languages'
         curr_time = str(int(time.time()))
-        try:
-            reader = self.client.create_reader(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{languages_topic}",
-                reader_name=f'{languages_topic}_sub_{curr_time}',
-                start_message_id=MessageId.earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating reader for 'languages' topic: {e} ***\n")
-            reader.close()
-            return
+        while True:
+            try:
+                reader = self.client.create_reader(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{languages_topic}",
+                    reader_name=f'{languages_topic}_sub_{curr_time}',
+                    start_message_id=MessageId.earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating reader for 'languages' topic: {e} ***\n")
+                print("Waiting 1 sec")
+                time.sleep(1)
 
         language_list = []
         while reader.has_message_available():
@@ -701,16 +721,18 @@ class PulsarConnection:
         
         # Publish current list language to 'aggregate_languages_info'. It will make Pulsar
         # Functions work on them
-        try:
-            lang_result_topic = 'aggregate_languages_info'
-            lang_result_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{lang_result_topic}',
-                producer_name=f'{lang_result_topic}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating 'aggregate_languages_info' topic: {e} ***\n")
-            lang_result_producer.close()
-            return
+        while True:
+            try:
+                lang_result_topic = 'aggregate_languages_info'
+                lang_result_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{lang_result_topic}',
+                    producer_name=f'{lang_result_topic}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating 'aggregate_languages_info' topic: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
         
         for lang in language_list:
             try:
@@ -725,15 +747,17 @@ class PulsarConnection:
         # with unique name, so it always start from the beginning
         topic_name = 'commit_repo_info'
         curr_time = str(int(time.time()))
-        try:
-            reader = self.client.create_reader(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                reader_name=f'{topic_name}_sub_{curr_time}',
-                start_message_id=MessageId.earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating reader for commit_repo_info: {e} ***\n")
-            reader.close()
-            return
+        while True:
+            try:
+                reader = self.client.create_reader(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                    reader_name=f'{topic_name}_sub_{curr_time}',
+                    start_message_id=MessageId.earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating reader for commit_repo_info: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
         
         # Ordered list supporting in-place insertion
         ord_list = sortedcontainers.SortedKeyList(key=lambda x: -x.commits)
@@ -762,16 +786,18 @@ class PulsarConnection:
         
         # Now publish the results in a {cutoff_date}_result_commit topic, with tuples in a
         # (id_repo, num_commits, 'repo_owner', 'repo_name') format
-        try:
-            topic_name = f'{cutoff_date}_result_commit'
-            result_commit_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception creating '{cutoff_date}_result_commit' topic: {e} ***\n")
-            result_commit_producer.close()
-            return
+        while True:
+            try:
+                topic_name = f'{cutoff_date}_result_commit'
+                result_commit_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating '{cutoff_date}_result_commit' topic: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
         
         for repo in ord_list.irange():
             try:
@@ -785,17 +811,19 @@ class PulsarConnection:
         
         # Send a message to the 'initialized' topic sharing the cutoff date of the results
         print("\n*** Reporting the cutoff date to the 'initialized' topic *** \n")
-        try:
-            curr_time = str(int(time.time()))
-            topic_name = 'initialized'
-            init_producer = self.client.create_producer(
-                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                producer_name=f'{topic_name}_prod_{curr_time}',
-                message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-        except Exception as e:
-            print(f"\n*** Exception sending cutoff date to 'initialized': {e} ***\n")
-            init_producer.close()
-            return
+        while True:
+            try:
+                curr_time = str(int(time.time()))
+                topic_name = 'initialized'
+                init_producer = self.client.create_producer(
+                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                    producer_name=f'{topic_name}_prod_{curr_time}',
+                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
+                break
+            except Exception as e:
+                print(f"\n*** Exception sending cutoff date to 'initialized': {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
         
         try:
             init_producer.send((f'{cutoff_date}').encode('utf-8'))
@@ -804,6 +832,7 @@ class PulsarConnection:
             init_producer.close()
             return      
         
+        init_producer.close()
         return True
 
     def get_current_cuttoff_date(self):
@@ -813,14 +842,17 @@ class PulsarConnection:
         # This info is kept in the 'initialized' topic
         init_topic = 'initialized'
         curr_time = str(int(time.time()))
-        try:
-            reader = self.client.create_reader(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
-                reader_name=f'{init_topic}_sub_{curr_time}',
-                start_message_id=MessageId.earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating reader for 'initialized' topic: {e} ***\n")
-            return
+        while True:
+            try:
+                reader = self.client.create_reader(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{init_topic}",
+                    reader_name=f'{init_topic}_sub_{curr_time}',
+                    start_message_id=MessageId.earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating reader for 'initialized' topic: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
 
         message_list = []
         while reader.has_message_available():
@@ -858,15 +890,17 @@ class PulsarConnection:
         # The results are kept in the {cutoff-date}_result_commit' topic
         topic_name = f"{cutoff_date}_result_commit"
         curr_time = str(int(time.time()))
-        try:
-            reader = self.client.create_reader(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                reader_name=f'{topic_name}_sub_{curr_time}',
-                start_message_id=MessageId.earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating reader for '{cutoff_date}_result_commit' topic: {e} ***\n")
-            reader.close()
-            return
+        while True:
+            try:
+                reader = self.client.create_reader(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                    reader_name=f'{topic_name}_sub_{curr_time}',
+                    start_message_id=MessageId.earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating reader for '{cutoff_date}_result_commit' topic: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
 
         result_list = []
         while (reader.has_message_available() and len(result_list)<num_values):
@@ -894,15 +928,17 @@ class PulsarConnection:
         # The results are kept in the 'public/static/language_results' topic
         topic_name = 'language_results'
         curr_time = str(int(time.time()))
-        try:
-            reader = self.client.create_reader(
-                topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                reader_name=f'{topic_name}_sub_{curr_time}',
-                start_message_id=MessageId.earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating reader for 'language_results' topic: {e} ***\n")
-            reader.close()
-            return
+        while True:
+            try:
+                reader = self.client.create_reader(
+                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
+                    reader_name=f'{topic_name}_sub_{curr_time}',
+                    start_message_id=MessageId.earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating reader for 'language_results' topic: {e} ***\n")
+                print("Wait 1 sec")
+                time.sleep(1)
 
         result_dict = {}
         while reader.has_message_available():
