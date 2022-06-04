@@ -34,7 +34,7 @@ floating_ip = None
 image_name = "Ubuntu 20.04 - 2021.03.23"
 start_ansible = True
 
-identifier = random.randint(1000,9999)
+#identifier = random.randint(1000,9999)
 
 loader = loading.get_plugin_loader('password')
 
@@ -110,12 +110,12 @@ secgroups = ['default']
 
 print ("Creating instances ... ")
 #update key here
-instance_worker1 = nova.servers.create(name="group_12_worker1_"+str(identifier), image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker1, nics=nics,security_groups=secgroups)
-instance_worker2 = nova.servers.create(name="group_12_worker2_"+str(identifier), image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker2, nics=nics,security_groups=secgroups)
-instance_worker3 = nova.servers.create(name="group_12_worker3_"+str(identifier), image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker3, nics=nics,security_groups=secgroups)
-instance_worker4 = nova.servers.create(name="group_12_worker4_"+str(identifier), image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker4, nics=nics,security_groups=secgroups)
-instance_client = nova.servers.create(name="group_12_client_"+str(identifier), image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_client, nics=nics,security_groups=secgroups)
-instance_server = nova.servers.create(name="group_12_server_"+str(identifier), image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_server, nics=nics,security_groups=secgroups)
+instance_worker1 = nova.servers.create(name="group_12_worker1", image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker1, nics=nics,security_groups=secgroups)
+instance_worker2 = nova.servers.create(name="group_12_worker2", image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker2, nics=nics,security_groups=secgroups)
+instance_worker3 = nova.servers.create(name="group_12_worker3", image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker3, nics=nics,security_groups=secgroups)
+instance_worker4 = nova.servers.create(name="group_12_worker4", image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_worker4, nics=nics,security_groups=secgroups)
+instance_client = nova.servers.create(name="group_12_client", image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_client, nics=nics,security_groups=secgroups)
+instance_server = nova.servers.create(name="group_12_server", image=image, flavor=flavor, key_name='olzmanskeyz',userdata=userdata_server, nics=nics,security_groups=secgroups)
 
 inst_status_worker1 = instance_worker1.status
 inst_status_worker2 = instance_worker2.status

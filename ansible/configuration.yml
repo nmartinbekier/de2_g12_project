@@ -23,7 +23,6 @@
    - name: Download git repository
      become: true
      git:
-      #repo: 'https://olledelborg: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@github.com/nmartinbekier/de2_g12_project.git'
       repo: 'https://olledelborg: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@github.com/nmartinbekier/de2_g12_project.git'
       dest: /home/ubuntu/de2_g12_project/
    
@@ -31,7 +30,6 @@
    - name: Change ownership of a directory
      become: true
      file:
-      #path might need update
       path: /ansible
       state: directory
       recurse: yes
@@ -421,18 +419,8 @@
 
    - name: Initialize main.py on pulsar server
      become: true
-     
-     command: export pulsar_host=localhost
-     command: export debug=false
-     command: python3 /$HOME/de2_g12_project/producer/main.py
-   
+     command: bash init_script.sh
+
    - name: Run start script on pulsar server
-     # Run pulsar in standalone mode as a docker container, exposing the appropriate ports and mounting some dirs
-     command: docker run -p 6650:6650  -p 8080:8080 --mount source=pulsardata,target=/pulsar/data --mount source=pulsarconf,target=/pulsar/conf apachepulsar/pulsar:2.9.1 bin/pulsar standalone
-
-     # Sleep for a minute to ensure pulsar has started before initializing it. 
-     # There are probably more efficient ways of knowing when its started though
-     command: sleep 1m
-
-     # Initialize pulsar with the functions and namespaces required for the producer/consumer
-     command: /$HOME/./de2_g12_project/producer/scripts/init-pulsar.sh
+     become: true
+     command: bash run_script.sh
