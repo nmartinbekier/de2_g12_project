@@ -70,6 +70,8 @@ class PulsarConnection:
         self.static_namespace = 'static'
         self.initializing = False
         self.initialized = False
+        self.token_list = None
+        self.current_token = 1
         self.last_day_processed = False
         self.days_to_review = 15 # Lapse of days to make an update on partial results
         self.top_repos_partial_results = 100 # Top commited repositories to publish in partial results
@@ -82,6 +84,14 @@ class PulsarConnection:
         """ Remeber to close when finished working """
         try: self.client.close()
         except Exception as e: print(f"\n*** Exception: {e} ***\n")
+        
+    def eval_message(self, message):
+        """ Check the message can be evaluated """
+        try:
+            processed_message = eval(message)
+        except:
+            processed_message = False
+        return processed_message
         
     def _set_init_status(self):
         """ Identifying the status based on messages of 'initialized' topic.
@@ -126,6 +136,10 @@ class PulsarConnection:
             self.initialized = True
             self.initializing = False
         reader.close()
+        
+        # Load tokens (workaround to loading them through Pulsar)
+        self.token_list = [token.split("#")[0].strip() for token in open(
+            "tokens.txt", "r").readlines()]
         
         return True
 
@@ -260,15 +274,18 @@ class PulsarConnection:
         topic_name = 'day_to_process'
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
-        try:
-            day_consumer = self.client.subscribe(
-                topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
-                subscription_name=f'{topic_name}_sub',
-                initial_position=_pulsar.InitialPosition.Earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating day_consumer: {e} ***\n")
-            day_consumer.close()
-            return
+        while True:
+            try:
+                day_consumer = self.client.subscribe(
+                    topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
+                    subscription_name=f'{topic_name}_sub',
+                    initial_position=_pulsar.InitialPosition.Earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating day_consumer: {e} ***\n")
+                print(f"Waiting 4 secs until its liberated")
+                time.sleep(4)
+                #day_consumer.close()
             
         try:
             msg = day_consumer.receive()
@@ -305,121 +322,82 @@ class PulsarConnection:
         return self.initialized
     
     def put_free_token(self, token):
-        """ Posts a token id string with available quota """
-        while True:
-            try:
-                topic_name = 'free_token'
-                free_token_producer = self.client.create_producer(
-                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                    producer_name=f'{topic_name}_prod',
-                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-                break
-            except Exception as e:
-                print(f"\n*** Exception creating 'free_token' topic: {e} ***\nRetrying in 5s..\n")
-                time.sleep(5)
-                #free_token_producer.close()
-                return
-       
-        try:
-            free_token_producer.send((
-                f"{token}").encode('utf-8'))      
-        except Exception as e:
-            print(f"\n*** Exception sending date message: {e} ***\n")
-            free_token_producer.close()
-            return
-            
-        free_token_producer.close()        
+        """ Updated: now not using Pulsar for topic management.
+        Now only iterating through list """        
         return True
     
+    
     def get_free_token(self):
-        """ pops the string of an available token """
-        topic_name = 'free_token'
-        while True:
-            try:
-                free_token_consumer = self.client.subscribe(
-                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                    subscription_name=f'{topic_name}_sub',
-                    initial_position=_pulsar.InitialPosition.Earliest)
-                break
-            except Exception as e:
-                print(f"\n*** Exception creating free_token_consumer: {e} ***\nRetrying in 5s...\n")
-                time.sleep(5)
-                #free_token_consumer.close()
-        
-        try:
-            # Give up to half a second to receive an answer
-            msg = free_token_consumer.receive(timeout_millis=500)
-            # Save the string message (decode from byte value)
-            token = str(msg.value().decode())
-            # Acknowledge that the message was received          
-            free_token_consumer.acknowledge(msg)
-        except Exception as e:
-            print(f"\n*** Exception receiving value from 'free_token_consumer': {e} ***")
-            print("Might have run out of free tokens\n")
-            free_token_consumer.close()
-            return None
-        
-        free_token_consumer.close()
+        """ Updated version: takes the next token from self.token_list """
+        token = self.token_list[self.current_token]
+        self.current_token = (self.current_token+1)%len(self.token_list)
         return token
     
     def put_standby_token(self, token):
-        """ posts a token id string from a token with exhausted quota """
-        topic_name = 'standby_token'
-        while True:
-            try:
-                standby_token_producer = self.client.create_producer(
-                    topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
-                    producer_name=f'{topic_name}_prod',
-                    message_routing_mode=PartitionsRoutingMode.UseSinglePartition)
-                break
-            except Exception as e:
-                print(f"\n*** Exception creating 'standby_token' topic: {e} ***\nRetrying in 5s...\n")
-                time.sleep(5)
-                #standby_token_producer.close()
-                return
-       
-        try:
-            standby_token_producer.send((
-                f"{token}").encode('utf-8'))      
-        except Exception as e:
-            print(f"\n*** Exception sending standby_token message: {e} ***\n")
-            standby_token_producer.close()
-            return False
-            
-        standby_token_producer.close()
+        """ Updated: now not using Pulsar for topic management.
+        Now only iterating through list """   
         return True
 
     def get_standby_token(self):
-        """  pops the string of a standby token """
-        topic_name = 'standby_token'
-        while True:
-            try:
-                standby_token_consumer = self.client.subscribe(
-                    topic=f"persistent://{self.tenant}/{self.static_namespace}/{topic_name}",
-                    subscription_name=f'{topic_name}_sub',
-                    initial_position=_pulsar.InitialPosition.Earliest)
-                break
-            except Exception as e:
-                print(f"\n*** Exception creating standby_token_consumer: {e} ***\nRetrying in 5s...\n")
-                time.sleep(5)
-                #standby_token_consumer.close()
-                return None
-        
+        """ Updated: now not using Pulsar for topic management.
+        Now only iterating through list """   
+        return self.get_free_token()
+    
+    def show_token_status(self):
+        """ Just checks how the status of the free and standby tokens are currently.
+        Returns a tuple with two lists ( [free_tokens], [standby_tokens] ) """
         try:
-            # Give up to half a second to receive an answer
-            msg = standby_token_consumer.receive(timeout_millis=500)
-            # Save the string message (decode from byte value)
-            token = str(msg.value().decode())
-            # Acknowledge that the message was received          
-            standby_token_consumer.acknowledge(msg)
-        except Exception as e:
-            print(f"\n*** Exception receiving value from 'standby_token_consumer': {e} ***")
-            print("Might have run out of standby tokens\n")
-            standby_token_consumer.close()
-            return None
+            curr_time = str(int(time.time()))
+            topic_name = 'free_token'
+            reader = self.client.create_reader(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                reader_name=topic_name+'_read_'+curr_time,
+                start_message_id=MessageId.earliest)
+            has_messages = reader.has_message_available()
+        except Exception as e: print(f"\n*** Exception: {e} ***\n")
+        if not has_messages:
+            print("\nIt seems there is no information of free tokens\n")
+            reader.close()
+            return
         
-        standby_token_consumer.close()
-        return token
+        free_token_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 600 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=600)
+                # Save the string message (decode from byte value)
+                free_token_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception checking for info from 'free_token' topic: {e} ***\n")
+                break
+        reader.close()
+
+        try:
+            curr_time = str(int(time.time()))
+            topic_name = 'standby_token'
+            reader = self.client.create_reader(
+                topic=f'persistent://{self.tenant}/{self.static_namespace}/{topic_name}',
+                reader_name=topic_name+'_read_'+curr_time,
+                start_message_id=MessageId.earliest)
+            has_messages = reader.has_message_available()
+        except Exception as e: print(f"\n*** Exception: {e} ***\n")
+        if not has_messages:
+            print("\nIt seems there is no information of standby tokens\n")
+            reader.close()
+            return
+        
+        standby_token_list = []
+        while reader.has_message_available():
+            try:
+                # Give up to 600 milliseconds to receive an answer
+                msg = reader.read_next(timeout_millis=600)
+                # Save the string message (decode from byte value)
+                standby_token_list.append(str(msg.value().decode()))
+            except Exception as e:
+                print(f"\n*** Exception checking for info from 'standby_token' topic: {e} ***\n")
+                break
+        reader.close()
+        return ( (free_token_list, standby_token_list) )
     
     def put_basic_repo_info(self, repo_list):
         """ Publishes a series of (repo_id, 'owner', 'name', 'language') tuples in the
@@ -479,15 +457,17 @@ class PulsarConnection:
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
         topic_name = 'repos_for_commit_count'
-        try:
-            repos_for_commit_consumer = self.client.subscribe(
-                topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
-                subscription_name=f'{topic_name}_sub',
-                initial_position=_pulsar.InitialPosition.Earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
-            repos_for_commit_consumer.close()
-            return
+        while True:
+            try:
+                repos_for_commit_consumer = self.client.subscribe(
+                    topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
+                    subscription_name=f'{topic_name}_sub',
+                    initial_position=_pulsar.InitialPosition.Earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
+                print("Waiting 4 seconds to retry")
+                time.sleep(4)
         
         repo_list = []
         for i in range(num_repos):
@@ -496,13 +476,15 @@ class PulsarConnection:
                 msg = repos_for_commit_consumer.receive(timeout_millis=500)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
+                message = self.eval_message(message)
                 # Process message and append to repo_list
-                repo_list.append(eval(message))
+                if (message != False): repo_list.append(message)
                 # Acknowledge that the message was received          
                 repos_for_commit_consumer.acknowledge(msg)
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'repos_for_commit_count': {e} ***")
                 print("Might have reached the limit of available repos in the topic\n")
+                print(f"Message received: {message}")
                 break
         
         repos_for_commit_consumer.close()
@@ -515,15 +497,17 @@ class PulsarConnection:
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
         topic_name = 'repos_for_test_check'
-        try:
-            repos_for_test_check_consumer = self.client.subscribe(
-                topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
-                subscription_name=f'{topic_name}_sub',
-                initial_position=_pulsar.InitialPosition.Earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
-            repos_for_test_check_consumer.close()
-            return
+        while True:
+            try:
+                repos_for_test_check_consumer = self.client.subscribe(
+                    topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
+                    subscription_name=f'{topic_name}_sub',
+                    initial_position=_pulsar.InitialPosition.Earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating basic_repo_info: {e} ***\n")
+                print("Waiting 4 secs to retry")
+                time.sleep(4)
         
         repo_list = []
         for i in range(num_repos):
@@ -532,12 +516,14 @@ class PulsarConnection:
                 msg = repos_for_test_check_consumer.receive(timeout_millis=300)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
+                message = self.eval_message(message)
                 # Process message and append to repo_list
-                repo_list.append(eval(message))
+                if (message != False): repo_list.append(message)
                 # Acknowledge that the message was received          
                 repos_for_test_check_consumer.acknowledge(msg)
             except Exception as e:
                 print(f"\n*** Exception receiving value from 'repos_for_test_check': {e} ***")
+                print(f"Message received: {message}")
                 print("Might have reached the limit of available repos in the topic\n")
                 break
         
@@ -603,15 +589,17 @@ class PulsarConnection:
         # Create a consumer on persistent topic, always using the same name,
         # so it always references to the current read position
         topic_name = 'repo_with_tests'
-        try:
-            repo_with_tests_consumer = self.client.subscribe(
-                topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
-                subscription_name=f'{topic_name}_sub',
-                initial_position=_pulsar.InitialPosition.Earliest)
-        except Exception as e:
-            print(f"\n*** Exception creating repo_with_tests: {e} ***\n")
-            repo_with_tests_consumer.close()
-            return
+        while True:
+            try:
+                repo_with_tests_consumer = self.client.subscribe(
+                    topic=f"persistent://{self.tenant}/{self.namespace}/{topic_name}",
+                    subscription_name=f'{topic_name}_sub',
+                    initial_position=_pulsar.InitialPosition.Earliest)
+                break
+            except Exception as e:
+                print(f"\n*** Exception creating repo_with_tests: {e} ***\n")
+                print("Waiting 4 secs to retry")
+                time.sleep(4)
         
         repo_list = []
         for i in range(num_repos):
@@ -620,8 +608,9 @@ class PulsarConnection:
                 msg = repo_with_tests_consumer.receive(timeout_millis=200)
                 # Save the string message (decode from byte value)
                 message = str(msg.value().decode())
+                message = self.eval_message(message)
                 # Process message and append to repo_list
-                repo_list.append(eval(message))
+                if (message != False): repo_list.append(message)
                 # Acknowledge that the message was received          
                 repo_with_tests_consumer.acknowledge(msg)
             except Exception as e:

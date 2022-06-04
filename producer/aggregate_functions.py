@@ -26,6 +26,14 @@ class AggregateFunction(Function):
     def __init__(self):
         self.tenant = 'public'
         self.namespace = 'static'
+        
+    def eval_message(self, message):
+        """ Check the message can be evaluated """
+        try:
+            processed_message = eval(message)
+        except:
+            processed_message = False
+        return processed_message
 
     # This function gets called each time a day is published in
     # the topic: persistent://public/static/days_processed
@@ -37,7 +45,8 @@ class AggregateFunction(Function):
         in_topic = context.get_current_message_topic_name()
         if 'repos_for_commit_count' in in_topic:
             # basic_repo_info: (repo_id, 'owner', 'name', 'language')
-            message = eval(item) # convert byte to text, and then to tuple
+            message = self.eval_message(message) # try to convert message to tuple
+            if message == False: break
             repo_id = str(message[0])            
             context.incr_counter(f'{repo_id}', 1) # register we've reviewed repo_id
             if (context.get_counter(f'{repo_id}') == 1):
@@ -50,7 +59,8 @@ class AggregateFunction(Function):
                         topic_name=f"persistent://{self.tenant}/{self.namespace}/languages",
                         message=(message[3]).encode('utf-8'))
         elif 'repo_with_tests' in in_topic:
-            message = eval(item)
+            message = self.eval_message(message) # try to convert message to tuple
+            if message == False: break
             repo_id = str(message[0])
             # repo_with_tests: (repo_id, 'owner', 'name', 'language')
             repo_id_tests = f"{repo_id}-tests"
@@ -60,7 +70,8 @@ class AggregateFunction(Function):
                 language_tests = f"{message[3]}-tests"
                 context.incr_counter(f'{language_tests}', 1)
         elif 'repo_with_ci' in in_topic:
-            message = eval(item)
+            message = self.eval_message(message) # try to convert message to tuple
+            if message == False: break
             repo_id = str(message[0])
             # repo_wit_ci: (repo_id, 'owner', 'name', 'language')
             # This time there's no need to check if the repo has been processed multiple times
