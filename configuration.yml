@@ -370,8 +370,8 @@
 
    - name: Initialize main.py on pulsar server
      become: true
-     command: bash init_script.sh
+     command: bash /config/init_script.sh
 
    - name: Run start script on pulsar server
      become: true
-     command: bash run_script.sh
+     command: bash /config/run_script.sh
