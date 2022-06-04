@@ -26,7 +26,6 @@
       repo: 'https://olledelborg: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@github.com/nmartinbekier/de2_g12_project.git'
       dest: /home/ubuntu/de2_g12_project/
    
-# unsure about this
    - name: Change ownership of a directory
      become: true
      file:
@@ -39,7 +38,7 @@
 - hosts: worker1server
  
   vars_files:
-   - setup_var.yml  
+   - /config/setup_var.yml  
   
   tasks:  
    - name: Extra packages
@@ -98,22 +97,10 @@
       dest: /usr/local/bin/docker-compose
       mode: +x  
 
-   #- name: Building containers
-   #  become: true
-   #  shell: docker build .
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/producer.py
-
-   #- name: Running containers
-   #  become: true
-   #  shell: docker-compose up -d 
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/ 
-
 - hosts: worker2server
  
   vars_files:
-   - setup_var.yml
+   - /config/setup_var.yml
 
   tasks:
    - name: Extra packages
@@ -172,22 +159,11 @@
       dest: /usr/local/bin/docker-compose
       mode: +x
 
-   #- name: Building containers
-   #  become: true
-   #  shell: docker build .
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/producer.py
-
-   #- name: Running containers
-   #  become: true
-   #  shell: docker-compose up -d 
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/ 
 
 - hosts: worker3server
  
   vars_files:
-   - setup_var.yml
+   - /config/setup_var.yml
 
   tasks:
    - name: Extra packages
@@ -246,22 +222,11 @@
       dest: /usr/local/bin/docker-compose
       mode: +x
 
-   #- name: Building containers
-   #  become: true
-   #  shell: docker build .
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/producer.py
-
-   #- name: Running containers
-   #  become: true
-   #  shell: docker-compose up -d 
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/ 
 
 - hosts: worker4server
  
   vars_files:
-   - setup_var.yml
+   - /config/setup_var.yml
 
   tasks:
    - name: Extra packages
@@ -320,24 +285,10 @@
       dest: /usr/local/bin/docker-compose
       mode: +x
 
-   #- name: Building containers
-   #  become: true
-   #  shell: docker build .
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/producer.py
-
-   #- name: Running containers
-   #  become: true
-   #  shell: docker-compose up -d 
-   #  args: 
-   #   chdir: home/ubuntu/de2_g12_project/ 
-
-
-
 - hosts: clientserver
   
   vars_files:
-   - setup_var.yml
+   - /config/setup_var.yml
 
   tasks:
    - name: Extra packages
@@ -358,7 +309,7 @@
 - hosts: serverserver
 
   vars_files:
-   - setup_var.yml
+   - /config/setup_var.yml
 
   tasks:
    - name: Extra packages
@@ -419,8 +370,8 @@
 
    - name: Initialize main.py on pulsar server
      become: true
-     command: bash init_script.sh
+     command: bash /config/init_script.sh
 
    - name: Run start script on pulsar server
      become: true
-     command: bash run_script.sh
+     command: bash /config/run_script.sh
