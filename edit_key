@@ -1,0 +1,3 @@
+#!/bin/bash 
+echo Cecking if IP is in known_hosts ...
+ssh-keygen -F $1 >/dev/null || ssh-keyscan -H $1 >> ~/.ssh/known_hosts

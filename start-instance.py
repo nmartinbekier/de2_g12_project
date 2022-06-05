@@ -63,12 +63,10 @@ else:
 #print(os.getcwd() + "\n")
 #---------------------------------------------------------------------worker1
 cfg_file_path =  os.getcwd()+'/config/worker-cfg.txt'
-print(os.path.isfile(cfg_file_path))
 if os.path.isfile(cfg_file_path):
     userdata_worker1 = open(cfg_file_path)
 else:
     sys.exit("worker-cfg.txt is not in config directory")
-
 #---------------------------------------------------------------------worker2
 cfg_file_path =  os.getcwd()+'/config/worker-cfg.txt'
 if os.path.isfile(cfg_file_path):
@@ -103,9 +101,6 @@ if os.path.isfile(cfg_file_path):
 else:
     sys.exit("server-cfg.txt is not in current working directory")
 
-
-
-
 secgroups = ['default']
 
 print ("Creating instances ... ")
@@ -135,8 +130,8 @@ while inst_status_server == 'BUILD' or inst_status_client == 'BUILD' or inst_sta
     print ("Instance: "+instance_worker4.name+" is in "+inst_status_worker4+" state, sleeping for 5 seconds more...")
     print ("Instance: "+instance_client.name+" is in "+inst_status_client+" state, sleeping for 5 seconds more...")
     print ("Instance: "+instance_server.name+" is in "+inst_status_server+" state, sleeping for 5 seconds more...")
-
     time.sleep(5)
+    os.system("clear")
     inst_status_worker1 = instance_worker1.status
     inst_status_worker2 = instance_worker2.status
     inst_status_worker3 = instance_worker3.status
@@ -152,10 +147,13 @@ while inst_status_server == 'BUILD' or inst_status_client == 'BUILD' or inst_sta
     instance_server = nova.servers.get(instance_server.id)
 
 
+ip_list = []
+
 ip_address_worker1 = None
 for network in instance_worker1.networks[private_net]:
     if re.match('\d+\.\d+\.\d+\.\d+', network):
         ip_address_worker1 = network
+        ip_list.append(ip_address_worker1)
         break
 if ip_address_worker1 is None:
     raise RuntimeError('No IP address assigned!')
@@ -164,6 +162,7 @@ ip_address_worker2 = None
 for network in instance_worker2.networks[private_net]:
     if re.match('\d+\.\d+\.\d+\.\d+', network):
         ip_address_worker2 = network
+        ip_list.append(ip_address_worker2)
         break
 if ip_address_worker2 is None:
     raise RuntimeError('No IP address assigned!')
@@ -172,6 +171,7 @@ ip_address_worker3 = None
 for network in instance_worker3.networks[private_net]:
     if re.match('\d+\.\d+\.\d+\.\d+', network):
         ip_address_worker3 = network
+        ip_list.append(ip_address_worker3)
         break
 if ip_address_worker3 is None:
     raise RuntimeError('No IP address assigned!')
@@ -180,6 +180,7 @@ ip_address_worker4 = None
 for network in instance_worker4.networks[private_net]:
     if re.match('\d+\.\d+\.\d+\.\d+', network):
         ip_address_worker4 = network
+        ip_list.append(ip_address_worker4)
         break
 if ip_address_worker4 is None:
     raise RuntimeError('No IP address assigned!')
@@ -189,6 +190,7 @@ ip_address_client = None
 for network in instance_client.networks[private_net]:
     if re.match('\d+\.\d+\.\d+\.\d+', network):
         ip_address_client = network
+        ip_list.append(ip_address_client)
         break
 if ip_address_client is None:
     raise RuntimeError('No IP address assigned!')
@@ -198,6 +200,7 @@ ip_address_server = None
 for network in instance_server.networks[private_net]:
     if re.match('\d+\.\d+\.\d+\.\d+', network):
         ip_address_server = network
+        ip_list.append(ip_address_server)
         break
 if ip_address_server is None:
     raise RuntimeError('No IP address assigned!')
@@ -220,12 +223,32 @@ print("Adding worker2 ip address: " + ip_address_worker2 + " to /etc/ansible/hos
 print("Adding worker3 ip address: " + ip_address_worker3 + " to /etc/ansible/hosts")
 print("Adding worker4 ip address: " + ip_address_worker4 + " to /etc/ansible/hosts")
 print("Adding client ip address: " + ip_address_client + " to /etc/ansible/hosts")
-print("Adding server ip address: " + ip_address_server + " to /etc/ansible/hosts")
+print("Adding server ip address: " + ip_address_server + " to /etc/ansible/hosts" + "\n")
 
+os.system("bash edit_key "+str(ip_address_worker1))
+os.system("bash edit_key "+str(ip_address_worker2))
+os.system("bash edit_key "+str(ip_address_worker3))
+os.system("bash edit_key "+str(ip_address_worker4))
+os.system("bash edit_key "+str(ip_address_client))
+os.system("bash edit_key "+str(ip_address_server))
+
+#print("Adding new IP addresses to know_hosts...")
+
+#for i in range(0, len(ip_list)):
+#    os.system("ssh-keyscan -H "+ ip_list[i] + " >> ~/.ssh/known_hosts")
+
+
+
+#os.system("ssh-keyscan -H "+ str(ip_address_worker1)+ " >> ~/.ssh/known_hosts")
+#os.system("ssh-keyscan -H "+ str(ip_address_worker2)+ " >> ~/.ssh/known_hosts")
+#os.system("ssh-keyscan -H "+ str(ip_address_worker3)+ " >> ~/.ssh/known_hosts")
+#os.system("ssh-keyscan -H "+ str(ip_address_worker4)+ " >> ~/.ssh/known_hosts")
+#os.system("ssh-keyscan -H "+ str(ip_address_client)+ " >> ~/.ssh/known_hosts")
+#os.system("ssh-keyscan -H "+ str(ip_address_server)+ " >> ~/.ssh/known_hosts")
 if start_ansible:
-    print("Waiting for 15 minutes..")
+    print("Waiting for 15 minutes ...")
     time.sleep(900)
-    print("Starting Ansible")
+    print("Starting Ansible ...")
     os.system("export ANSIBLE_HOST_KEY_CHECKING=False")
     time.sleep(2)
     os.system("ansible-playbook configuration.yml --private-key=/home/ubuntu/cluster-keys/cluster-key")
