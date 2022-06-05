@@ -41,15 +41,6 @@
    - /config/setup_var.yml  
   
   tasks:  
-   - name: Extra packages
-     apt: pkg={{item}} state=latest update_cache=true 
-     with_items:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-     become: true  
-
    - name: apt update
      apt: update_cache=yes upgrade=dist
      become: true
@@ -103,15 +94,6 @@
    - /config/setup_var.yml
 
   tasks:
-   - name: Extra packages
-     apt: pkg={{item}} state=latest update_cache=true
-     with_items:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-     become: true
-
    - name: apt update
      apt: update_cache=yes upgrade=dist
      become: true
@@ -166,15 +148,6 @@
    - /config/setup_var.yml
 
   tasks:
-   - name: Extra packages
-     apt: pkg={{item}} state=latest update_cache=true
-     with_items:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-     become: true
-
    - name: apt update
      apt: update_cache=yes upgrade=dist
      become: true
@@ -229,15 +202,6 @@
    - /config/setup_var.yml
 
   tasks:
-   - name: Extra packages
-     apt: pkg={{item}} state=latest update_cache=true
-     with_items:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-     become: true
-
    - name: apt update
      apt: update_cache=yes upgrade=dist
      become: true
@@ -312,15 +276,6 @@
    - /config/setup_var.yml
 
   tasks:
-   - name: Extra packages
-     apt: pkg={{item}} state=latest update_cache=true
-     with_items:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - software-properties-common
-     become: true
-
    - name: apt update
      apt: update_cache=yes upgrade=dist
      become: true
