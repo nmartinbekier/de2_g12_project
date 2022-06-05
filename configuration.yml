@@ -38,7 +38,7 @@
 - hosts: worker1server
  
   vars_files:
-   - /config/setup_var.yml  
+   - /orchestration-config/setup_var.yml  
   
   tasks:  
    - name: apt update
@@ -91,7 +91,7 @@
 - hosts: worker2server
  
   vars_files:
-   - /config/setup_var.yml
+   - /orchestration-config/setup_var.yml
 
   tasks:
    - name: apt update
@@ -145,7 +145,7 @@
 - hosts: worker3server
  
   vars_files:
-   - /config/setup_var.yml
+   - /orchestration-config/setup_var.yml
 
   tasks:
    - name: apt update
@@ -199,7 +199,7 @@
 - hosts: worker4server
  
   vars_files:
-   - /config/setup_var.yml
+   - /orchestration-config/setup_var.yml
 
   tasks:
    - name: apt update
@@ -252,7 +252,7 @@
 - hosts: clientserver
   
   vars_files:
-   - /config/setup_var.yml
+   - /orchestration-config/setup_var.yml
 
   tasks:
    - name: Extra packages
@@ -273,7 +273,7 @@
 - hosts: serverserver
 
   vars_files:
-   - /config/setup_var.yml
+   - /orchestration-config/setup_var.yml
 
   tasks:
    - name: apt update
