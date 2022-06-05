@@ -62,40 +62,40 @@ else:
 #print("Path at terminal when executing this file")
 #print(os.getcwd() + "\n")
 #---------------------------------------------------------------------worker1
-cfg_file_path =  os.getcwd()+'/config/worker-cfg.txt'
+cfg_file_path =  os.getcwd()+'/orchestration-config/worker-cfg.txt'
 if os.path.isfile(cfg_file_path):
     userdata_worker1 = open(cfg_file_path)
 else:
     sys.exit("worker-cfg.txt is not in config directory")
 #---------------------------------------------------------------------worker2
-cfg_file_path =  os.getcwd()+'/config/worker-cfg.txt'
+cfg_file_path =  os.getcwd()+'/orchestration-config/worker-cfg.txt'
 if os.path.isfile(cfg_file_path):
     userdata_worker2 = open(cfg_file_path)
 else:
     sys.exit("worker-cfg.txt is not in config directory")
 
 #---------------------------------------------------------------------worker3
-cfg_file_path =  os.getcwd()+'/config/worker-cfg.txt'
+cfg_file_path =  os.getcwd()+'/orchestration-config/worker-cfg.txt'
 if os.path.isfile(cfg_file_path):
     userdata_worker3 = open(cfg_file_path)
 else:
     sys.exit("worker-cfg.txt is not in config directory")
 #---------------------------------------------------------------------worker4
-cfg_file_path =  os.getcwd()+'/config/worker-cfg.txt'
+cfg_file_path =  os.getcwd()+'/orchestration-config/worker-cfg.txt'
 if os.path.isfile(cfg_file_path):
     userdata_worker4 = open(cfg_file_path)
 else:
     sys.exit("worker-cfg.txt is not in config directory")
 
 #---------------------------------------------------------------------client
-cfg_file_path =  os.getcwd()+'/config/client-cfg.txt'
+cfg_file_path =  os.getcwd()+'/orchestration-config/client-cfg.txt'
 if os.path.isfile(cfg_file_path):
     userdata_client = open(cfg_file_path)
 else:
     sys.exit("client-cfg.txt is not in current working directory")
 
 #---------------------------------------------------------------------server
-cfg_file_path =  os.getcwd()+'/config/server-cfg.txt'
+cfg_file_path =  os.getcwd()+'/orchestration-config/server-cfg.txt'
 if os.path.isfile(cfg_file_path):
     userdata_server = open(cfg_file_path)
 else:
@@ -213,9 +213,8 @@ print ("Instance: "+ instance_worker4.name +" is in " + inst_status_worker4 + " 
 print ("Instance: "+ instance_client.name +" is in " + inst_status_client + " state" + " ip address: "+ ip_address_client)
 print ("Instance: "+ instance_server.name +" is in " + inst_status_server + " state" + " ip address: "+ ip_address_server)
 
-#update etc/ansible/hosts with IP. Note: must be sudo to run
+#update etc/ansible/hosts with IP.
 text_file = open("/etc/ansible/hosts", "w")
-#n = text_file.write("[servers]" + "\n" + "prodserver ansible_host=" + ip_address_prod+ "\n" + "conserver ansible_host=" + ip_address_dev + "\n" + "[all:vars]" + "\n" + "ansible_python_interpreter=/usr/bin/python3" + "\n" + "[prodserver]" + "\n" + "prodserver ansible_connection=ssh ansible_user=ubuntu" + "\n" + "[devserver]" + "\n" +"devserver ansible_connection=ssh ansible_user=ubuntu")
 n = text_file.write("[servers]"+"\n"+"worker1server ansible_host="+ip_address_worker1+"\n"+"worker2server ansible_host="+ip_address_worker2+"\n"+"worker3server ansible_host="+ip_address_worker3+"\n"+"worker4server ansible_host="+ip_address_worker4+"\n"+"clientserver ansible_host="+ip_address_client+"\n"+"serverserver ansible_host="+ip_address_server+"\n"+"[all:vars]" + "\n" +"ansible_python_interpreter=/usr/bin/python3" + "\n" +"[worker1server]" + "\n" +"worker1server ansible_connection=ssh ansible_user=ubuntu" + "\n" +"[worker2server]" + "\n" +"worker2server ansible_connection=ssh ansible_user=ubuntu" + "\n" +"[worker3server]" + "\n" +"worker3server ansible_connection=ssh ansible_user=ubuntu" + "\n" +"[worker4server]" + "\n" +"worker4server ansible_connection=ssh ansible_user=ubuntu" + "\n" +"[clientserver]" + "\n" +"clientserver ansible_connection=ssh ansible_user=ubuntu" + "\n" +"[serverserver]" + "\n" +"serverserver ansible_connection=ssh ansible_user=ubuntu")
 text_file.close()
 print("Adding worker1 ip address: " + ip_address_worker1 + " to /etc/ansible/hosts")
@@ -232,19 +231,6 @@ os.system("bash edit_key "+str(ip_address_worker4))
 os.system("bash edit_key "+str(ip_address_client))
 os.system("bash edit_key "+str(ip_address_server))
 
-#print("Adding new IP addresses to know_hosts...")
-
-#for i in range(0, len(ip_list)):
-#    os.system("ssh-keyscan -H "+ ip_list[i] + " >> ~/.ssh/known_hosts")
-
-
-
-#os.system("ssh-keyscan -H "+ str(ip_address_worker1)+ " >> ~/.ssh/known_hosts")
-#os.system("ssh-keyscan -H "+ str(ip_address_worker2)+ " >> ~/.ssh/known_hosts")
-#os.system("ssh-keyscan -H "+ str(ip_address_worker3)+ " >> ~/.ssh/known_hosts")
-#os.system("ssh-keyscan -H "+ str(ip_address_worker4)+ " >> ~/.ssh/known_hosts")
-#os.system("ssh-keyscan -H "+ str(ip_address_client)+ " >> ~/.ssh/known_hosts")
-#os.system("ssh-keyscan -H "+ str(ip_address_server)+ " >> ~/.ssh/known_hosts")
 if start_ansible:
     print("Waiting for 15 minutes ...")
     time.sleep(900)
