@@ -34,6 +34,7 @@ floating_ip_pool_name = None
 floating_ip = None
 image_name = "Ubuntu 20.04 - 2021.03.23"
 start_ansible = True
+auto_key = True
 
 loader = loading.get_plugin_loader('password')
 
@@ -224,12 +225,14 @@ print("Adding worker4 ip address: " + ip_address_worker4 + " to /etc/ansible/hos
 print("Adding client ip address: " + ip_address_client + " to /etc/ansible/hosts")
 print("Adding server ip address: " + ip_address_server + " to /etc/ansible/hosts" + "\n")
 
-os.system("bash edit_key "+str(ip_address_worker1))
-os.system("bash edit_key "+str(ip_address_worker2))
-os.system("bash edit_key "+str(ip_address_worker3))
-os.system("bash edit_key "+str(ip_address_worker4))
-os.system("bash edit_key "+str(ip_address_client))
-os.system("bash edit_key "+str(ip_address_server))
+#automatic adding of key to .ssh/known_hosts
+if auto_key:
+    os.system("bash /orchestration-config/edit_key "+str(ip_address_worker1))
+    os.system("bash /orchestration-config/edit_key "+str(ip_address_worker2))
+    os.system("bash /orchestration-config/edit_key "+str(ip_address_worker3))
+    os.system("bash /orchestration-config/edit_key "+str(ip_address_worker4))
+    os.system("bash /orchestration-config/edit_key "+str(ip_address_client))
+    os.system("bash /orchestration-config/edit_key "+str(ip_address_server))
 
 if start_ansible:
     print("Waiting for 15 minutes ...")
